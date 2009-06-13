@@ -21,6 +21,7 @@ int main(void) {
 	puts("Welcome to CIPUP");
 	cout << "Cipup Is Privacy for the Ultra Paranoid!" << endl;
 
+	// Simple Pause
 	cout << "Press Enter to continue . . .\n";
 	getchar();
 
