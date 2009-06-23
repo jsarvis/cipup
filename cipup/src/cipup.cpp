@@ -15,6 +15,10 @@
 ================================================================*/
 
 #include <iostream>
+#include <exception>
+//#include <cstdlib>
+//#include <time.h>
+#include "..\prng\ecrypt-sync.h"
 using namespace std;
 
 int main(void) {
