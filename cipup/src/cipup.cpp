@@ -18,16 +18,13 @@
 #include <exception>
 //#include <cstdlib>
 //#include <time.h>
+#include "cipup.hpp"
 #include "..\prng\ecrypt-sync.h"
 using namespace std;
 
-int main(void) {
-	puts("Welcome to CIPUP");
-	cout << "Cipup Is Privacy for the Ultra Paranoid!" << endl;
+//class DLLEXPORT(cipup) {
 
-	// Simple Pause
-	cout << "Press Enter to continue . . .\n";
-	getchar();
-
-	return EXIT_SUCCESS;
+extern "C" __declspec(dllexport)
+void VersionText() {
+	cout << "CIPUP v0.001" << endl;
 }
