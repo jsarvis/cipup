@@ -1,0 +1,14 @@
+<?xml version='1.0'?>
+<project basedir='.' default='all' name='netoots'>
+  <property name='nant.settings.currentframework' value='net-2.0'/>
+  <property name='build' value='bin'/>
+  <property name='src' value='src'/>
+  <target depends='Client' name='all'/>
+  <target name='Client'>
+    <csc debug='true' optimize='true' output='${build}/Client.exe' target='exe' warninglevel='4'>
+      <sources>
+        <include name='${src}/Client.cs'/>
+      </sources>
+    </csc>
+  </target>
+</project>
