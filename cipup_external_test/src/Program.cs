@@ -17,7 +17,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using cipup_internal_test;
 
 namespace cipup_external_test
 {
@@ -27,9 +26,11 @@ namespace cipup_external_test
         static void Main(string[] args)
         {
             Console.WriteLine("Test ext test");
-            test alpha = new test();
+            cipup_internal_test.test alpha = new cipup_internal_test.test();
             Console.WriteLine(alpha.GetVersionTextTest());
             Console.WriteLine(alpha.PrintVersionTextTest());
+
+            cipup.encrypt_engine beta = new cipup.encrypt_engine();
 
         }
     }
