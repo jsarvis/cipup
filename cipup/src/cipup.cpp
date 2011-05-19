@@ -1,5 +1,5 @@
 /*=============================================================
-   Copyright 2009 Jacob Sarvis
+   Copyright 2009-2011 Jacob Sarvis
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -14,17 +14,45 @@
    limitations under the License.
 ================================================================*/
 
+// cipup.cpp : Defines the exported functions for the DLL application.
+//
+
 #include <iostream>
 #include <exception>
-//#include <cstdlib>
+#include <cstdlib>
 //#include <time.h>
+#include "stdafx.h"
 #include "cipup.hpp"
 #include "..\prng\ecrypt-sync.h"
 using namespace std;
 
-//class DLLEXPORT(cipup) {
+namespace cipup {
 
-extern "C" __declspec(dllexport)
-void VersionText() {
-	cout << "CIPUP v0.001" << endl;
-}
+	// This is an example of an exported variable
+	//CIPUP_API int ncipup=0;
+
+	// This is an example of an exported function.
+	/*CIPUP_API int fncipup(void)
+	{
+		return 42;
+	}*/
+
+	CIPUP_API string GetVersionText()
+	{
+		return  "CIPUP v"+VERSION_NUMBER;
+	}
+
+	CIPUP_API void PrintVersionText()
+	{
+		cout << "CIPUP v" << VERSION_NUMBER << endl;
+	}
+
+
+	// This is the constructor of a class that has been exported.
+	// see cipup.h for the class definition
+	cipup_encrypt_engine::cipup_encrypt_engine()
+	{
+		return;
+	}
+
+} //namespace cipup

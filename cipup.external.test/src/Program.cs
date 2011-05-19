@@ -1,6 +1,6 @@
-/*=============================================================
-   Copyright 2009 Jacob Sarvis
-
+﻿/*=============================================================
+   Code Copyright 2011 Jacob Sarvis
+ 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -13,23 +13,18 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 ================================================================*/
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 
-#include <iostream>
-#include <exception>
-//#include <cstdlib>
-//#include <time.h>
-#include "cipup.hpp"
-using namespace std;
-
-int main(void) {
-	puts("Welcome to CIPUP");
-	cout << "Cipup Is Privacy for the Ultra Paranoid!" << endl;
-
-	VersionText();
-
-	// Simple Pause
-	cout << "Press Enter to continue . . .\n";
-	getchar();
-
-	return EXIT_SUCCESS;
+namespace cipup.external.test
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            Console.WriteLine("Test ext test");
+        }
+    }
 }
