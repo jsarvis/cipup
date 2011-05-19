@@ -13,24 +13,23 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 ================================================================*/
-// The following ifdef block is the standard way of creating macros which make exporting 
-// from a DLL simpler. All files within this DLL are compiled with the CIPUPINTERNALTEST_EXPORTS
-// symbol defined on the command line. this symbol should not be defined on any project
-// that uses this DLL. This way any other project whose source files include this file see 
-// CIPUPINTERNALTEST_API functions as being imported from a DLL, whereas this DLL sees symbols
-// defined with this macro as being exported.
+
 #using <mscorlib.dll>
 using namespace System;
+using namespace NUnit::Framework;
 
 // This class is exported from the cipup.internal.test.dll
 
 namespace cipup_internal_test {
 
+	[TestFixture]
 	public ref class test {
 	public:
 		test(void);
-		bool GetVersionTextTest();
-		bool PrintVersionTextTest();
+		[Test]
+		void GetVersionTextTest();
+		[Test]
+		void PrintVersionTextTest();
 		// TODO: add your methods here.
 	};
 

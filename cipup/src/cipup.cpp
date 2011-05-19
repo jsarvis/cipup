@@ -35,7 +35,7 @@ namespace cipup {
 
 	void PrintVersionText()
 	{
-		cout << "CIPUP v" << VERSION_NUMBER << endl;
+		Console::Write( String::Concat("CIPUP v", gcnew String(VERSION_NUMBER)) );
 	}
 
 

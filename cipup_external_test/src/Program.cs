@@ -17,19 +17,24 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using NUnit.Framework;
 
 namespace cipup_external_test
 {
+    [TestFixture]
     class Program
     {
-
-        static void Main(string[] args)
+        [Test]
+        public void InternalVersionTest()
         {
-            Console.WriteLine("Test ext test");
             cipup_internal_test.test alpha = new cipup_internal_test.test();
-            Console.WriteLine(alpha.GetVersionTextTest());
-            Console.WriteLine(alpha.PrintVersionTextTest());
+            alpha.GetVersionTextTest();
+            alpha.PrintVersionTextTest();
+        }
 
+        [Test]
+        public void InitializationTest()
+        {
             cipup.encrypt_engine beta = new cipup.encrypt_engine();
 
         }

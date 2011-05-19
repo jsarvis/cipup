@@ -36,18 +36,15 @@ namespace cipup_internal_test {
 		return;
 	}
 
-	bool test::GetVersionTextTest()
+	void test::GetVersionTextTest()
 	{
-		cout << "GetVersionTextTest" << endl;
 		Console::WriteLine( cipup::GetVersionText() );
-		return true;
+		//Assert::AreEqual( );
 	}
 
-	bool test::PrintVersionTextTest()
+	void test::PrintVersionTextTest()
 	{
-		cout << "PrintVersionTextTest" << endl;
 		cipup::PrintVersionText();
-		return true;
 	}
 
 } //namespace cipup_internal_test
