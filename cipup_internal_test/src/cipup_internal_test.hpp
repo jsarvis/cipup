@@ -19,22 +19,19 @@
 // that uses this DLL. This way any other project whose source files include this file see 
 // CIPUPINTERNALTEST_API functions as being imported from a DLL, whereas this DLL sees symbols
 // defined with this macro as being exported.
-#ifdef CIPUPINTERNALTEST_EXPORTS
-#define CIPUPINTERNALTEST_API __declspec(dllexport)
-#else
-#define CIPUPINTERNALTEST_API __declspec(dllimport)
-#endif
+#using <mscorlib.dll>
+using namespace System;
 
 // This class is exported from the cipup.internal.test.dll
 
-class CIPUPINTERNALTEST_API Ccipupinternaltest {
-public:
-	Ccipupinternaltest(void);
-    bool GetVersionTextTest();
-    bool PrintVersionTextTest();
-	// TODO: add your methods here.
-};
+namespace cipup_internal_test {
 
-//extern CIPUPINTERNALTEST_API int ncipupinternaltest;
+	public ref class test {
+	public:
+		test(void);
+		bool GetVersionTextTest();
+		bool PrintVersionTextTest();
+		// TODO: add your methods here.
+	};
 
-//CIPUPINTERNALTEST_API int fncipupinternaltest(void);
+} //namespace cipup_internal_test

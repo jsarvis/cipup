@@ -17,14 +17,20 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using cipup_internal_test;
 
-namespace cipup.external.test
+namespace cipup_external_test
 {
     class Program
     {
+
         static void Main(string[] args)
         {
             Console.WriteLine("Test ext test");
+            test alpha = new test();
+            Console.WriteLine(alpha.GetVersionTextTest());
+            Console.WriteLine(alpha.PrintVersionTextTest());
+
         }
     }
-}
+} //namespace cipup_external_test

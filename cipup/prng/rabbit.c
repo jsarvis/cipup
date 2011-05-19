@@ -22,6 +22,12 @@
 /* The software is provided "as is" without any express or implied warranty.  */
 /******************************************************************************/
 
+
+#using <mscorlib.dll>
+#pragma unmanaged
+
+using namespace System;
+
 #include "ecrypt-sync.h"
 #include "ecrypt-portable.h"
 

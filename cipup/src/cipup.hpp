@@ -14,39 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ================================================================*/
 
-// The following ifdef block is the standard way of creating macros which make exporting 
-// from a DLL simpler. All files within this DLL are compiled with the CIPUP_EXPORTS
-// symbol defined on the command line. this symbol should not be defined on any project
-// that uses this DLL. This way any other project whose source files include this file see 
-// CIPUP_API functions as being imported from a DLL, whereas this DLL sees symbols
-// defined with this macro as being exported.
-#ifdef CIPUP_EXPORTS
-#define CIPUP_API __declspec(dllexport)
-#else
-#define CIPUP_API __declspec(dllimport)
-#endif
-
 #include <string>
 
-using namespace std;
+#using <mscorlib.dll>
+using namespace System;
+//using namespace System::Collections;
 
 namespace cipup {
 
-	const string VERSION_NUMBER = "0.003";
+	char VERSION_NUMBER[] = "0.003";
 
 	// This class is exported from the cipup.dll
-	class CIPUP_API cipup_encrypt_engine {
+	public ref class encrypt_engine {
 	public:
-		cipup_encrypt_engine(void);
+		encrypt_engine(void);
 		// TODO: add your methods here.
 	};
 
-	//extern CIPUP_API int ncipup;
+	String^ GetVersionText(void);
 
-	//CIPUP_API int fncipup(void);
-
-	CIPUP_API string GetVersionText(void);
-
-	CIPUP_API void PrintVersionText(void);
+	void PrintVersionText(void);
 
 } //namespace cipup

@@ -1,4 +1,6 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
+#pragma unmanaged
+
 #include "stdafx.h"
 
 BOOL APIENTRY DllMain( HMODULE hModule,

@@ -28,21 +28,12 @@ using namespace std;
 
 namespace cipup {
 
-	// This is an example of an exported variable
-	//CIPUP_API int ncipup=0;
-
-	// This is an example of an exported function.
-	/*CIPUP_API int fncipup(void)
+	String^ GetVersionText()
 	{
-		return 42;
-	}*/
-
-	CIPUP_API string GetVersionText()
-	{
-		return  "CIPUP v"+VERSION_NUMBER;
+		return String::Concat("CIPUP v", gcnew String(VERSION_NUMBER));
 	}
 
-	CIPUP_API void PrintVersionText()
+	void PrintVersionText()
 	{
 		cout << "CIPUP v" << VERSION_NUMBER << endl;
 	}
@@ -50,7 +41,7 @@ namespace cipup {
 
 	// This is the constructor of a class that has been exported.
 	// see cipup.h for the class definition
-	cipup_encrypt_engine::cipup_encrypt_engine()
+	encrypt_engine::encrypt_engine()
 	{
 		return;
 	}

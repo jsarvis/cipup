@@ -2,11 +2,10 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="9.00"
-	Name="cipup.internal.test"
+	Name="cipup_internal_test"
 	ProjectGUID="{420A8F9B-F633-454F-AFE8-BF7D2AB6A596}"
 	RootNamespace="cipupinternaltest"
 	Keyword="Win32Proj"
-	AssemblyReferenceSearchPaths="&quot;..\cipup\src&quot;"
 	TargetFrameworkVersion="196613"
 	>
 	<Platforms>
@@ -42,7 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;CIPUPINTERNALTEST_EXPORTS;CIPUP_EXPORTS"
+				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -94,6 +93,7 @@
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="2"
 			CharacterSet="1"
+			ManagedExtensions="1"
 			WholeProgramOptimization="1"
 			>
 			<Tool
@@ -115,12 +115,13 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;CIPUPINTERNALTEST_EXPORTS;CIPUP_EXPORTS"
+				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				DebugInformationFormat="3"
+				ForcedIncludeFiles=""
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -164,6 +165,11 @@
 		</Configuration>
 	</Configurations>
 	<References>
+		<AssemblyReference
+			RelativePath="..\..\..\..\Program Files (x86)\NUnit 2.5.10\bin\net-2.0\framework\nunit.framework.dll"
+			AssemblyName="nunit.framework, Version=2.5.10.11092, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL"
+			MinFrameworkVersion="131072"
+		/>
 	</References>
 	<Files>
 		<Filter
@@ -172,12 +178,25 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath="..\cipup\src\cipup.cpp"
+				RelativePath=".\src\cipup_internal_test.cpp"
 				>
-			</File>
-			<File
-				RelativePath=".\src\cipup.internal.test.cpp"
-				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						ForcedIncludeFiles="$(SolutionDir)cipup\src\cipup.cpp"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						AdditionalUsingDirectories=""
+						ForcedIncludeFiles="$(SolutionDir)cipup\src\cipup.cpp"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath=".\src\dllmain.cpp"
@@ -194,11 +213,7 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
-				RelativePath="..\cipup\src\cipup.hpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\cipup.internal.test.hpp"
+				RelativePath=".\src\cipup_internal_test.hpp"
 				>
 			</File>
 			<File

@@ -23,41 +23,32 @@
 //#include <cstdlib>
 //#include <time.h>
 #include "stdafx.h"
-#include "cipup.internal.test.hpp"
-
-#include "..\..\cipup\src\cipup.hpp"
+#include "cipup_internal_test.hpp"
 
 using namespace std;
 
-// This is an example of an exported variable
-//CIPUPINTERNALTEST_API int ncipupinternaltest=0;
+namespace cipup_internal_test {
 
-// This is an example of an exported function.
-/*CIPUPINTERNALTEST_API int fncipupinternaltest(void)
-{
-	return 42;
-}*/
+	// This is the constructor of a class that has been exported.
+	// see cipup.internal.test.h for the class definition
+	test::test()
+	{
+		return;
+	}
 
-// This is the constructor of a class that has been exported.
-// see cipup.internal.test.h for the class definition
-Ccipupinternaltest::Ccipupinternaltest()
-{
-	return;
-}
+	bool test::GetVersionTextTest()
+	{
+		cout << "GetVersionTextTest" << endl;
+		Console::WriteLine( cipup::GetVersionText() );
+		return true;
+	}
 
-bool Ccipupinternaltest::GetVersionTextTest()
-{
-	cout << "GetVersionTextTest" << endl;
-	string temp;
-	temp = cipup::GetVersionText();
-	cout << temp << endl;
-	return true;
-}
+	bool test::PrintVersionTextTest()
+	{
+		cout << "PrintVersionTextTest" << endl;
+		cipup::PrintVersionText();
+		return true;
+	}
 
-bool Ccipupinternaltest::PrintVersionTextTest()
-{
-	cout << "PrintVersionTextTest" << endl;
-	cipup::PrintVersionText();
-	return true;
-}
+} //namespace cipup_internal_test
 
