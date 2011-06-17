@@ -72,12 +72,6 @@
     <WCFMetadata Include="Service References\" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\cipup_internal_test\cipup_internal_test.vcproj">
-      <Project>{420A8F9B-F633-454F-AFE8-BF7D2AB6A596}</Project>
-      <Name>cipup_internal_test</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Framework.2.0">
       <Visible>False</Visible>
       <ProductName>.NET Framework 2.0 %28x86%29</ProductName>
@@ -98,6 +92,12 @@
       <ProductName>Windows Installer 3.1</ProductName>
       <Install>true</Install>
     </BootstrapperPackage>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\cipup\cipup.vcproj">
+      <Project>{C1ECC2F6-25BF-44AC-B023-D833329D4CA5}</Project>
+      <Name>cipup</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

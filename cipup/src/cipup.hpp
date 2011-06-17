@@ -15,24 +15,72 @@ limitations under the License.
 ================================================================*/
 
 #include <string>
+#include <vector>
+#include "stdafx.h"
 
 #using <mscorlib.dll>
 using namespace System;
+using namespace std;
 //using namespace System::Collections;
 
 namespace cipup {
 
-	char VERSION_NUMBER[] = "0.003";
+	enum MessageCode { InitSuccess = 0, InitFailure, InitFailureInvalidAction, InitFailureNeedFinalize, InitFailureFileError };
 
-	// This class is exported from the cipup.dll
-	public ref class encrypt_engine {
-	public:
-		encrypt_engine(void);
-		// TODO: add your methods here.
-	};
+	static const string Messages[2] = { "Init Successful", "Init Failure", "Init Failure: Invalid Action", "Init Failure: Already initialized, call finalize", "Init Failure: File access error" };
 
+
+	enum InitAction { InitDecrypt = 0, InitEncrypt };
+
+
+	//Static functions
 	String^ GetVersionText(void);
 
 	void PrintVersionText(void);
+
+	//Key helper functions
+	//genKey(int len)
+
+
+	// Non-exposed private data members and functions
+	class engine_internal;
+
+
+	// This class is exported from the cipup.dll
+	public ref class engine {
+	public:
+		engine(void);
+		~engine(void);
+
+		//Output designates destination
+		MessageCode init( InitAction action, ostringstream* output, uint8* key, uint8 keybytelen, uint8* iv, uint8 ivbytelen );
+		//Overwrites file on Encrypt, append only applys to decrypting destination
+		MessageCode init( InitAction action, const char* filename, bool append, uint8* key, uint8 keybytelen, uint8* iv, uint8 ivbytelen );
+		bool ready();
+		
+		bool canread();
+		//Consumes entire stream
+		void decrypt( const istream& input );
+		void operator>> ( const istream& input );
+
+		uint64 bytesread();
+
+		bool canwrite();
+		void encrypt( const uint8& datum );
+		void operator<< ( const uint8& datum );
+		void encrypt( const std::vector< uint8 >& data );
+		void operator<< ( const std::vector< uint8 >& data );
+		void flush();
+
+		uint64 bitswritten();
+		uint64 byteswritten();
+		uint8 underflowbits();
+
+		void finalize();
+		
+	private:
+		engine_internal* cpInternal;
+	};
+
 
 } //namespace cipup

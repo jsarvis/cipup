@@ -24,19 +24,12 @@ namespace cipup_external_test
     [TestFixture]
     class Program
     {
-        [Test]
-        public void InternalVersionTest()
-        {
-            cipup_internal_test.test alpha = new cipup_internal_test.test();
-            alpha.GetVersionTextTest();
-            alpha.PrintVersionTextTest();
-        }
 
         [Test]
         public void InitializationTest()
         {
-            cipup.encrypt_engine beta = new cipup.encrypt_engine();
-
+            cipup.engine beta = new cipup.engine();
+            
         }
     }
 } //namespace cipup_external_test

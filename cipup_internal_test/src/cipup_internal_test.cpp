@@ -40,6 +40,7 @@ namespace cipup_internal_test {
 	{
 		Console::WriteLine( cipup::GetVersionText() );
 		//Assert::AreEqual( );
+		//Assert::True( true, "msg1");
 	}
 
 	void test::PrintVersionTextTest()

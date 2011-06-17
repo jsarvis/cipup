@@ -13,21 +13,41 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ================================================================*/
-// stdafx.h : include file for standard system include files,
-// or project specific include files that are used frequently, but
-// are changed infrequently
-//
 
-#pragma once
 
-#define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
-// Windows Header Files:
-#include <windows.h>
+#include "..\bitstream\Bitstream.imp.h"
 
-typedef bool uint1;
-typedef unsigned char uint8;
-typedef unsigned short uint16;
-typedef unsigned int uint32;
-typedef unsigned long long uint64;
 
-// TODO: reference additional headers your program requires here
+#using <mscorlib.dll>
+using namespace Costella::Bitstream;
+using namespace System;
+
+namespace cipup {
+	
+	enum Status { NotReady = 0, Ready, SemiReady };
+	enum InitType { NotInit = 0, InitRead, InitWrite };
+	enum DestType { DestNone = 0, DestStream, DestFile };
+	
+	private class engine_internal {
+	public:
+		engine_internal();
+		~engine_internal();
+
+		Status eStatus;
+		InitType eInitType;
+		DestType eDestType;
+
+		//HuffmanEngine
+		stringstream ssBitBufferOut;
+		Out<>* bsBitBufferIn;
+		//RabbitPRNG
+
+		ostream* output;
+
+		uint64 ui64BitsWritten;
+		uint64 ui64BytesRead;
+
+	};
+
+
+} //namespace cipup

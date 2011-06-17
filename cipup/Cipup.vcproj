@@ -202,6 +202,14 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
+				RelativePath=".\bitstream\Bitstream.h"
+				>
+			</File>
+			<File
+				RelativePath=".\bitstream\Bitstream.imp.h"
+				>
+			</File>
+			<File
 				RelativePath=".\src\cipup.hpp"
 				>
 			</File>
@@ -219,6 +227,10 @@
 			</File>
 			<File
 				RelativePath=".\prng\ecrypt-sync.h"
+				>
+			</File>
+			<File
+				RelativePath=".\src\engine_internal.hpp"
 				>
 			</File>
 			<File
