@@ -7,7 +7,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cipup", "cipup\cipup.vcproj
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "cipup_external_test", "cipup_external_test\cipup_external_test.csproj", "{9A188DE5-4CA3-4DC5-BDD5-FCE55AF075A3}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cipup.internal.test", "cipup_internal_test\cipup_internal_test.vcproj", "{420A8F9B-F633-454F-AFE8-BF7D2AB6A596}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cipup_internal_test", "cipup_internal_test\cipup_internal_test.vcproj", "{420A8F9B-F633-454F-AFE8-BF7D2AB6A596}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C1ECC2F6-25BF-44AC-B023-D833329D4CA5} = {C1ECC2F6-25BF-44AC-B023-D833329D4CA5}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

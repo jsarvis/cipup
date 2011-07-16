@@ -30,7 +30,7 @@
 // Include files.
 #include "Bitstream.h"
 #include <sstream>
-
+#include <limits>
 
 // Put inside the Costella::Bitstream namespace.
 namespace Costella{ namespace Bitstream{

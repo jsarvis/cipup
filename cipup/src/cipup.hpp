@@ -27,7 +27,7 @@ namespace cipup {
 
 	enum MessageCode { InitSuccess = 0, InitFailure, InitFailureInvalidAction, InitFailureNeedFinalize, InitFailureFileError };
 
-	static const string Messages[2] = { "Init Successful", "Init Failure", "Init Failure: Invalid Action", "Init Failure: Already initialized, call finalize", "Init Failure: File access error" };
+	static const string Messages[5] = { "Init Successful", "Init Failure", "Init Failure: Invalid Action", "Init Failure: Already initialized, call finalize", "Init Failure: File access error" };
 
 
 	enum InitAction { InitDecrypt = 0, InitEncrypt };
@@ -60,8 +60,8 @@ namespace cipup {
 		
 		bool canread();
 		//Consumes entire stream
-		void decrypt( const istream& input );
-		void operator>> ( const istream& input );
+		void decrypt( istream& input );
+		void operator>> ( istream& input );
 
 		uint64 bytesread();
 

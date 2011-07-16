@@ -21,6 +21,7 @@ limitations under the License.
 #pragma once
 
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
+#define NOMINMAX //Exclude min/max macros
 // Windows Header Files:
 #include <windows.h>
 
@@ -31,3 +32,4 @@ typedef unsigned int uint32;
 typedef unsigned long long uint64;
 
 // TODO: reference additional headers your program requires here
+
