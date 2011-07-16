@@ -25,9 +25,10 @@ using namespace std;
 
 namespace cipup {
 
-	enum MessageCode { InitSuccess = 0, InitFailure, InitFailureInvalidAction, InitFailureNeedFinalize, InitFailureFileError };
+	enum MessageCode { InitSuccess = 0, InitFailure, InitFailureInvalidAction, InitFailureNeedFinalize, InitFailureFileError, InitFailureInvalidKeyLength, InitFailureInvalidIVLength };
 
-	static const string Messages[5] = { "Init Successful", "Init Failure", "Init Failure: Invalid Action", "Init Failure: Already initialized, call finalize", "Init Failure: File access error" };
+	static const string Messages[7] = { "Init Successful", "Init Failure", "Init Failure: Invalid action", "Init Failure: Already initialized, call finalize", "Init Failure: File access error", 
+		"Init Failure: Invalid Key length", "Init Failure: Invalid IV length" };
 
 
 	enum InitAction { InitDecrypt = 0, InitEncrypt };
@@ -39,6 +40,8 @@ namespace cipup {
 	void PrintVersionText(void);
 
 	//Key helper functions
+	uint8 RequiredKeyByteLength(void);
+	uint8 RequiredIVByteLength(void);
 	//genKey(int len)
 
 
@@ -74,7 +77,7 @@ namespace cipup {
 
 		uint64 bitswritten();
 		uint64 byteswritten();
-		uint8 underflowbits();
+		uint8 overflowbits();
 
 		void finalize();
 		

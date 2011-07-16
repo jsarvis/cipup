@@ -31,9 +31,21 @@ limitations under the License.
 // Warning: This switch will make cyphertext incompatible with Cipup builds that do not use this.
 //#define SHRINK_CYPHERTEXT
 
+// Buffer size of used keystream. This determines the maximum number of bytes of the keystream held in memory at any given time.
+// The safest value is one, but since Rabbit consumes the keystream in 16 byte blocks, any value not divisible by 16 discards the byte difference inside the PRNG.
+// Thus a value of one only uses the first byte of every 16 byte block. The smallest value that uses the entire keystream is 16.
+// Warning: This switch will make cyphertext incompatible with Cipup builds that use a different value. One value must be selected.
+#define KEYSTREAMBUFFERSIZE 16
+//#define KEYSTREAMBUFFERSIZE 1
 
+
+
+/* Do not adjust these */
+
+//Required by Rabbit
 #define KEYSIZEINBYTES 16
 #define IVSIZEINBYTES 8
+#define ECRYPT_BLOCKLENGTH 16
 
 // Character set size, must be divisible by 2
 // Full set size with dummies, if CHAR_SET_SIZE % 4 == 0, then add 2 dummies to ensure a huffman gearbox period of 2N
@@ -162,8 +174,8 @@ namespace cipup {
 
 		huffman_gearbox( InitType itype, ECRYPT_ctx* RabbitPRNGState );
 
-		huffman_gear& encode( uint8 datum );
-		void decode( istream& input, ostream* output ); //TODO change input type to compatible post-XOR data structure
+		void encode( uint8 datum, Out<>* bsBitBufferIn, uint16& ui16BitsBuffered );
+		void decode( istream& input, ostream* output, uint64& ui64BytesRead );
 
 	private:
 		
@@ -198,15 +210,18 @@ namespace cipup {
 		InitType eInitType;
 		DestType eDestType;
 
+		ECRYPT_ctx* RabbitPRNGState;
 		huffman_gearbox* cpHuffmanGearbox;
 		stringstream ssBitBufferOut;
 		Out<>* bsBitBufferIn;
-		ECRYPT_ctx* RabbitPRNGState;
+		uint16 ui16BitsBuffered;
 
 		ostream* output;
 
 		uint64 ui64BitsWritten;
 		uint64 ui64BytesRead;
+
+		void flush();
 
 	};
 	

@@ -41,6 +41,16 @@ namespace cipup {
 		Console::Write( String::Concat("CIPUP v", gcnew String(VERSION_NUMBER)) );
 	}
 
+	uint8 RequiredKeyByteLength(void)
+	{
+		return KEYSIZEINBYTES;
+	}
+
+	uint8 RequiredIVByteLength(void)
+	{
+		return IVSIZEINBYTES;
+	}
+
 	twoBitKeystreamStack::~twoBitKeystreamStack()
 	{
 		delete keyStream;
@@ -49,7 +59,7 @@ namespace cipup {
 	twoBitKeystreamStack::twoBitKeystreamStack( ECRYPT_ctx* iRabbitPRNGState )
 	{
 		RabbitPRNGState = iRabbitPRNGState;
-		keyStream = new u8[1];
+		keyStream = new u8[KEYSTREAMBUFFERSIZE];
 	}
 
 	uint8 twoBitKeystreamStack::pop()
@@ -58,7 +68,16 @@ namespace cipup {
 
 		if ( twoBitChunks.size() == 0 )
 		{			
-			ECRYPT_keystream_bytes(RabbitPRNGState, keyStream, 1);
+			ECRYPT_keystream_bytes(RabbitPRNGState, keyStream, KEYSTREAMBUFFERSIZE);
+#if KEYSTREAMBUFFERSIZE > 1
+			for ( uint16 index = KEYSTREAMBUFFERSIZE-1; index > 0; index-- )
+			{
+				twoBitChunks.push_back( (keyStream[index]>>6) & 0x3 );
+				twoBitChunks.push_back( (keyStream[index]>>4) & 0x3 );
+				twoBitChunks.push_back( (keyStream[index]>>2) & 0x3 );
+				twoBitChunks.push_back( keyStream[index] & 0x3 );
+			}
+#endif
 			twoBitChunks.push_back( (keyStream[0]>>6) & 0x3 );
 			twoBitChunks.push_back( (keyStream[0]>>4) & 0x3 );
 			twoBitChunks.push_back( (keyStream[0]>>2) & 0x3 );
@@ -82,7 +101,7 @@ namespace cipup {
 	oneBitKeystreamStack::oneBitKeystreamStack( ECRYPT_ctx* iRabbitPRNGState )
 	{
 		RabbitPRNGState = iRabbitPRNGState;
-		keyStream = new u8[1];
+		keyStream = new u8[KEYSTREAMBUFFERSIZE];
 	}
 
 	uint1 oneBitKeystreamStack::pop()
@@ -91,7 +110,20 @@ namespace cipup {
 
 		if ( oneBitChunks.size() == 0 )
 		{			
-			ECRYPT_keystream_bytes(RabbitPRNGState, keyStream, 1);
+			ECRYPT_keystream_bytes(RabbitPRNGState, keyStream, KEYSTREAMBUFFERSIZE);
+#if KEYSTREAMBUFFERSIZE > 1
+			for ( uint16 index = KEYSTREAMBUFFERSIZE-1; index > 0; index-- )
+			{
+				oneBitChunks.push_back( (keyStream[index]>>7) & 0x1 );
+				oneBitChunks.push_back( (keyStream[index]>>6) & 0x1 );
+				oneBitChunks.push_back( (keyStream[index]>>5) & 0x1 );
+				oneBitChunks.push_back( (keyStream[index]>>4) & 0x1 );
+				oneBitChunks.push_back( (keyStream[index]>>3) & 0x1 );
+				oneBitChunks.push_back( (keyStream[index]>>2) & 0x1 );
+				oneBitChunks.push_back( (keyStream[index]>>1) & 0x1 );
+				oneBitChunks.push_back( keyStream[index] & 0x1 );
+			}
+#endif
 			oneBitChunks.push_back( (keyStream[0]>>7) & 0x1 );
 			oneBitChunks.push_back( (keyStream[0]>>6) & 0x1 );
 			oneBitChunks.push_back( (keyStream[0]>>5) & 0x1 );
@@ -629,30 +661,94 @@ namespace cipup {
 		}
 	}
 
-	huffman_gear& huffman_gearbox::encode( uint8 datum )
+	void huffman_gearbox::encode( uint8 datum, Out<>* bsBitBufferIn, uint16& ui16BitsBuffered  )
 	{
-		//TODO SHRINK_CYPHERTEXT
-#ifdef FASTER_HUFFMAN // Faster crank
-		huffman_gear& temp = *(aacpGearTable[ui16Counter][datum]);
-#else // More secure
-		huffman_gear& temp = *(acpGears[datum]);
+		huffman_gear* temp;
+#ifdef SHRINK_CYPHERTEXT
+		uint8 datumUpper = datum >> 4;
+		datum = datum & 0xF;
 #endif
-		crank();		
-		return temp;
+
+#ifdef FASTER_HUFFMAN // Faster crank
+		temp = aacpGearTable[ui16Counter][datum];
+#else // More secure
+		temp = acpGears[datum];
+#endif
+		bsBitBufferIn->bits(temp->data, temp->numBits);
+		ui16BitsBuffered += temp->numBits;
+		crank();
+
+#ifdef SHRINK_CYPHERTEXT
+
+#ifdef FASTER_HUFFMAN // Faster crank
+		temp = aacpGearTable[ui16Counter][datumUpper];
+#else // More secure
+		temp = acpGears[datumUpper];
+#endif
+		bsBitBufferIn->bits(temp->data, temp->numBits);
+		ui16BitsBuffered += temp->numBits;
+		crank();
+#endif
 	}
 
-	void huffman_gearbox::decode( istream& input, ostream* output )
+	void huffman_gearbox::decode( istream& input, ostream* output, uint64& ui64BytesRead )
 	{
 		//consume entire stream until dummy found
 		oneBitIstreamStack TreeNavigator ( input );
 
 		treenode* treeCursor;
 
+#ifdef SHRINK_CYPHERTEXT
+		uint8 temp;
+#endif
+
 		while ( input.good() || TreeNavigator.buffered() )
 		{
+			treeCursor = cpTreeCrown; //Rewind to top of tree
 
-			//TODO SHRINK_CYPHERTEXT
+			//Navigate down to a leaf, consuming bits
+			while ( treeCursor->IsLeaf == false )
+			{
+				if ( TreeNavigator.pop() == 0 )
+				{
+					treeCursor = ((treebranch*)treeCursor)->zero;
+				}
+				else
+				{
+					treeCursor = ((treebranch*)treeCursor)->one;				
+				}
+			}
 
+#ifdef FASTER_HUFFMAN // Faster crank
+			if ( aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum] < CHAR_SET_SIZE )
+			{
+#ifdef SHRINK_CYPHERTEXT
+				temp = aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum];
+#else
+				*output << aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum];
+#endif
+			}
+#else // More secure
+			if ( aui8ReverseSet[((treeleaf*)treeCursor)->datum] < CHAR_SET_SIZE )
+			{
+#ifdef SHRINK_CYPHERTEXT
+				temp = aui8ReverseSet[((treeleaf*)treeCursor)->datum];
+#else
+				*output << aui8ReverseSet[((treeleaf*)treeCursor)->datum];
+#endif
+				
+			}
+#endif
+			else
+			{
+				crank();
+				return;
+			}
+
+			crank();
+
+#ifdef SHRINK_CYPHERTEXT
+			//Get the upper half-byte
 
 			treeCursor = cpTreeCrown; //Rewind to top of tree
 
@@ -672,21 +768,23 @@ namespace cipup {
 #ifdef FASTER_HUFFMAN // Faster crank
 			if ( aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum] < CHAR_SET_SIZE )
 			{
-				*output << aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum];
+				*output << ( ((aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum])<<4) | temp );
 			}
 #else // More secure
 			if ( aui8ReverseSet[((treeleaf*)treeCursor)->datum] < CHAR_SET_SIZE )
 			{
-				*output << aui8ReverseSet[((treeleaf*)treeCursor)->datum];
+				*output << ( ((aui8ReverseSet[((treeleaf*)treeCursor)->datum])<<4) | temp );			
 			}
 #endif
 			else
 			{
-				crank();
-				return;
+				//ERROR, should not happen
+				throw Exception("ERROR! Upper part of Half-Byte encoding is terminal character!");
 			}
 
 			crank();
+#endif
+			ui64BytesRead++;
 		}
 	}
 
@@ -905,6 +1003,41 @@ namespace cipup {
 		}
 	}
 
+	void engine_internal::flush()
+	{
+		//Write dummy terminal character through huffman gearbox into bit buffer
+		cpHuffmanGearbox->encode( (uint8)CHAR_SET_SIZE, bsBitBufferIn, ui16BitsBuffered );
+		
+		//Flush any remaining bits in the bit buffer into the output stream, which might create padding
+		bsBitBufferIn->flush();
+
+		//ssBitBufferOut is middletext
+		uint8 middletext[ECRYPT_BLOCKLENGTH]; //middletext input buffer for PRNG
+		uint8 cryptext[ECRYPT_BLOCKLENGTH]; //cryptext output buffer for PRNG
+		//output is cryptext
+
+		//Consume full blocks from bit buffer, XORing and feeding to output
+		while ( ui16BitsBuffered >= ECRYPT_BLOCKLENGTH*8 )
+		{				
+			ssBitBufferOut.read((char *)middletext, ECRYPT_BLOCKLENGTH); //Pull a block into buffer
+			ECRYPT_encrypt_blocks(RabbitPRNGState, middletext, cryptext, 1); //XOR
+			ui64BitsWritten += ECRYPT_BLOCKLENGTH*8;
+			ui16BitsBuffered -= ECRYPT_BLOCKLENGTH*8; //Mark bit buffer reduction
+			output->write((char *)cryptext, ECRYPT_BLOCKLENGTH); //Dump into output
+		}
+		
+		if ( ui16BitsBuffered > 0 )
+		{
+			//Remaining bytes
+			uint8 RemainingBytes = (ui16BitsBuffered % 8 > 0 ) ? ((ui16BitsBuffered/8)+1) : (ui16BitsBuffered/8);
+			ssBitBufferOut.read((char *)middletext, RemainingBytes ); //Pull a block into buffer
+			ECRYPT_encrypt_bytes(RabbitPRNGState, middletext, cryptext, RemainingBytes); //XOR
+			ui64BitsWritten += ui16BitsBuffered;
+			ui16BitsBuffered = 0; //Mark bit buffer reduction				
+			output->write((char *)cryptext, RemainingBytes ); //Dump into output
+		}
+	}
+
 	// This is the constructor of a class that has been exported.
 	// see cipup.h for the class definition
 	engine::engine()
@@ -948,7 +1081,7 @@ namespace cipup {
 	{
 		return (cpInternal->ui64BitsWritten)/8;
 	}
-	uint8 engine::underflowbits()
+	uint8 engine::overflowbits()
 	{
 		return (uint8)((cpInternal->ui64BitsWritten)%8);
 	}
@@ -957,17 +1090,38 @@ namespace cipup {
 	{
 		if ( cpInternal->eStatus == NotReady )
 		{
+			if ( keybytelen != KEYSIZEINBYTES )
+			{
+				return InitFailureInvalidKeyLength;
+			}
+			if ( ivbytelen != IVSIZEINBYTES )
+			{
+				return InitFailureInvalidIVLength;
+			}
+
 			if ( action == InitDecrypt )
 			{
+				//Build PRNG
+				cpInternal->RabbitPRNGState = new ECRYPT_ctx;
+				ECRYPT_init();
+				ECRYPT_keysetup(cpInternal->RabbitPRNGState, key, keybytelen*8, ivbytelen*8); //bit size of key and iv
+				ECRYPT_ivsetup(cpInternal->RabbitPRNGState, iv);
 
-				//TODO Build PRNG & HE
+				//Build HuffmanEngine
+				cpInternal->cpHuffmanGearbox = new huffman_gearbox( InitRead, cpInternal->RabbitPRNGState );
 
 				cpInternal->eInitType = InitRead;
 			}
 			else if ( action == InitEncrypt )
 			{
-				
-				//TODO Build PRNG & HE
+				//Build PRNG
+				cpInternal->RabbitPRNGState = new ECRYPT_ctx;
+				ECRYPT_init();
+				ECRYPT_keysetup(cpInternal->RabbitPRNGState, key, keybytelen*8, ivbytelen*8); //bit size of key and iv
+				ECRYPT_ivsetup(cpInternal->RabbitPRNGState, iv);
+
+				//Build HuffmanEngine
+				cpInternal->cpHuffmanGearbox = new huffman_gearbox( InitWrite, cpInternal->RabbitPRNGState );
 
 				//Clear bitstream
 				cpInternal->bsBitBufferIn->flush();
@@ -1007,6 +1161,15 @@ namespace cipup {
 	{
 		if ( cpInternal->eStatus == NotReady )
 		{
+			if ( keybytelen != KEYSIZEINBYTES )
+			{
+				return InitFailureInvalidKeyLength;
+			}
+			if ( ivbytelen != IVSIZEINBYTES )
+			{
+				return InitFailureInvalidIVLength;
+			}
+
 			if ( action == InitDecrypt )
 			{
 				cpInternal->output = new ofstream();
@@ -1024,7 +1187,14 @@ namespace cipup {
 					return InitFailureFileError;
 				}
 
-				//TODO Build PRNG & HE
+				//Build PRNG
+				cpInternal->RabbitPRNGState = new ECRYPT_ctx;
+				ECRYPT_init();
+				ECRYPT_keysetup(cpInternal->RabbitPRNGState, key, keybytelen*8, ivbytelen*8); //bit size of key and iv
+				ECRYPT_ivsetup(cpInternal->RabbitPRNGState, iv);
+
+				//Build HuffmanEngine
+				cpInternal->cpHuffmanGearbox = new huffman_gearbox( InitRead, cpInternal->RabbitPRNGState );
 
 				cpInternal->eInitType = InitRead;
 			}
@@ -1039,7 +1209,14 @@ namespace cipup {
 					return InitFailureFileError;
 				}
 
-				//TODO Build PRNG & HE
+				//Build PRNG
+				cpInternal->RabbitPRNGState = new ECRYPT_ctx;
+				ECRYPT_init();
+				ECRYPT_keysetup(cpInternal->RabbitPRNGState, key, keybytelen*8, ivbytelen*8); //bit size of key and iv
+				ECRYPT_ivsetup(cpInternal->RabbitPRNGState, iv);
+
+				//Build HuffmanEngine
+				cpInternal->cpHuffmanGearbox = new huffman_gearbox( InitWrite, cpInternal->RabbitPRNGState );
 
 				//Clear bitstream
 				cpInternal->bsBitBufferIn->flush();
@@ -1076,11 +1253,35 @@ namespace cipup {
 		{
 			if ( cpInternal->eStatus == Ready )
 			{
-
-				//TODO
+				//input is cryptext
+				uint8 cryptext[ECRYPT_BLOCKLENGTH]; //cryptext input buffer for PRNG
+				uint8 middletext[ECRYPT_BLOCKLENGTH]; //middletext output buffer for PRNG
+				stringstream MiddleTextBuf; //middletext input buffer for huffman gearbox
+				//output is plaintext
+				
 				//XOR entire stream
-				//feed to huffman gearbox
+				while ( !input.eof() )
+				{
+					input.read((char *)cryptext, ECRYPT_BLOCKLENGTH); //Try to pull a block into buffer
 
+					if ( input.gcount() == ECRYPT_BLOCKLENGTH )
+					{
+						//Full block
+						ECRYPT_decrypt_blocks(cpInternal->RabbitPRNGState, cryptext, middletext, 1); //XOR
+						MiddleTextBuf.write((char *)middletext, ECRYPT_BLOCKLENGTH); //Dump into buffer
+					}
+					else
+					{
+						//Remaining bytes
+						ECRYPT_decrypt_bytes(cpInternal->RabbitPRNGState, cryptext, middletext, input.gcount() ); //XOR
+						MiddleTextBuf.write((char *)middletext, input.gcount() ); //Dump into buffer, finishing message
+						break;
+					}
+
+				}
+								
+				//Feed middletext into huffman gearbox
+				cpInternal->cpHuffmanGearbox->decode( MiddleTextBuf, cpInternal->output, cpInternal->ui64BytesRead ); //Plaintext is feed directly into output stream
 			}
 		}
 	}
@@ -1107,11 +1308,27 @@ namespace cipup {
 
 			if ( cpInternal->eStatus == Ready )
 			{
-				//TODO
-				//encode datum in huffman gearbox
-				//feed bit vector into bitstream
+				//Encode datum byte in huffman gearbox into bit buffer
+				cpInternal->cpHuffmanGearbox->encode( datum, cpInternal->bsBitBufferIn, cpInternal->ui16BitsBuffered );
+				
+				//Consume full blocks from bit buffer if available, XORing and feeding to output
+				if ( cpInternal->ui16BitsBuffered >= ECRYPT_BLOCKLENGTH*8 )
+				{
+					//ssBitBufferOut is middletext
+					uint8 middletext[ECRYPT_BLOCKLENGTH]; //middletext input buffer for PRNG
+					uint8 cryptext[ECRYPT_BLOCKLENGTH]; //cryptext output buffer for PRNG
+					//output is cryptext
 
-				//consume any bytes from bitstream, XORing and feeding to output
+					do
+					{
+						cpInternal->ssBitBufferOut.read((char *)middletext, ECRYPT_BLOCKLENGTH); //Pull a block into buffer
+						ECRYPT_encrypt_blocks(cpInternal->RabbitPRNGState, middletext, cryptext, 1); //XOR
+						cpInternal->ui64BitsWritten += ECRYPT_BLOCKLENGTH*8;
+						cpInternal->ui16BitsBuffered -= ECRYPT_BLOCKLENGTH*8; //Mark bit buffer reduction
+						cpInternal->output->write((char *)cryptext, ECRYPT_BLOCKLENGTH); //Dump into output
+
+					} while ( cpInternal->ui16BitsBuffered >= ECRYPT_BLOCKLENGTH*8 );
+				}
 			}
 		}
 
@@ -1139,14 +1356,12 @@ namespace cipup {
 			{
 				if ( cpInternal->eStatus == Ready )
 				{
+					//Dump bit buffer into output
+					cpInternal->flush(); // Internal flush
 
-					//TODO
-
-					//cpInternal->bsBitBufferIn->flush();
-
-
-					//cpInternal->ssBitBufferOut.str( string() );
-					//cpInternal->ssBitBufferOut.clear();
+					//Reset bit buffer
+					cpInternal->ssBitBufferOut.str( string() );
+					cpInternal->ssBitBufferOut.clear();
 
 					//Set status
 					cpInternal->eStatus = SemiReady;
@@ -1172,13 +1387,11 @@ namespace cipup {
 			{
 				if ( cpInternal->eStatus == Ready )
 				{
-					flush();
+					cpInternal->flush(); //Internal flush
 				}
 
 				if ( cpInternal->eDestType == DestFile )
 				{
-					//Rewind and Write size
-				
 					((ofstream*)(cpInternal->output))->close();
 					delete ((ofstream*)(cpInternal->output));
 				}
