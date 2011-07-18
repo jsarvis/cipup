@@ -604,7 +604,13 @@ namespace cipup {
 		a.decrypt(input);
 	}
 
-	void engine::encrypt( uint8% datum )
+	void engine::encrypt( uint8 datum )
+	{
+		encrypt(&datum);
+		datum = 0;
+	}
+
+	void engine::encrypt( uint8* datum )
 	{
 		if ( cpInternal->eInitType == InitWrite )
 		{
@@ -626,7 +632,7 @@ namespace cipup {
 			if ( cpInternal->eStatus == Ready )
 			{
 				//Encode datum byte in huffman gearbox into bit buffer
-				cpInternal->cpHuffmanGearbox->encode( datum, cpInternal->bsBitBufferIn, cpInternal->ui16BitsBuffered );
+				cpInternal->cpHuffmanGearbox->encode( *datum, cpInternal->bsBitBufferIn, cpInternal->ui16BitsBuffered );
 				
 				//Consume full blocks from bit buffer if available, XORing and feeding to output
 				if ( cpInternal->ui16BitsBuffered >= ECRYPT_BLOCKLENGTH*8 )
@@ -664,10 +670,15 @@ namespace cipup {
 
 	}
 
-	void engine::operator<< ( engine% a, uint8% datum )
+	void engine::operator<< ( engine% a, uint8* datum )
 	{
 		a.encrypt(datum);
-	}	
+	}
+
+	void engine::operator<< ( engine% a, uint8& datum )
+	{
+		a.encrypt(&datum);
+	}
 
 	void engine::encrypt( array<uint8>^ data )
 	{
@@ -678,7 +689,7 @@ namespace cipup {
 	void engine::encrypt( std::vector< uint8 >& data )
 	{
 		for (uint32 i=0; i<data.size(); i++)
-			encrypt(data.at(i));
+			encrypt(&(data[i]));
 	}
 
 	void engine::operator<< ( engine% a, array<uint8>^ data )
@@ -717,7 +728,6 @@ namespace cipup {
 					array<uint8>^ inputBuf = gcnew array<uint8>(1);
 					long long numBytesToRead = inputBuf->Length;
 					int n;
-					uint8 temp;
 					while (numBytesToRead > 0)
 					{
 						// Read may return anything from 0 to 1.
@@ -729,12 +739,11 @@ namespace cipup {
 						}
 						else
 						{
-							temp = inputBuf[0];
-							encrypt(temp);							
+							encrypt(inputBuf[0]);
 						}
 						numBytesToRead -= (long long)n;
 					}
-					temp = 0;
+					inputBuf[0] = 0;
 				}
 			}
 		}
@@ -768,7 +777,7 @@ namespace cipup {
 				{
 					input >> curDatum;
 
-					encrypt(curDatum);
+					encrypt(&curDatum);
 				}
 
 				curDatum = 0; //Wipe data before it goes out of scope

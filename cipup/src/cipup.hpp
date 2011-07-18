@@ -40,6 +40,7 @@ namespace cipup {
 	ref class engine_internal;
 
 	/** <summary> Cipup engine class. Provides static helper methods. Instantiate to use the engine for encryption or decryption.
+		<para>CIPUP Is Privacy for the Ultra Paranoid</para>
 		<para>Output can be directed to a file or stringstream. Input can be directed from a file or stream.
 			Additionally during encryption, input can be provided as a single byte or vector of bytes.</para>
 		<para>Use <c>init()</c> to start the engine by setting the Key, IV, de/encryption action, and output destination.
@@ -122,6 +123,14 @@ namespace cipup {
 			<param name="keybytelen">Length of the array in bytes. Recommended values can be found by calling <c>RequiredKeyByteLength()</c> and <c>RequiredIVByteLength()</c>.</param>
 		*/
 		static void GenerateKey(array<uint8>^ key, uint8 keybytelen); 
+		/**
+			<summary>
+			Generates a new random Key or IV into the key array. Uses the <c>LocalEntropicSecureRand</c> technique by default.
+			<para>The key array will be allocated if null.</para>
+			</summary> 
+			<param name="key">Byte array to be filled with generated data.</param>
+			<param name="keybytelen">Length of the array in bytes. Recommended values can be found by calling <c>RequiredKeyByteLength()</c> and <c>RequiredIVByteLength()</c>.</param>
+		*/
 		static void GenerateKey(uint8*& key, uint8 keybytelen); //key array will be allocated if null.
 		/** 
 			<summary>
@@ -132,7 +141,16 @@ namespace cipup {
 			<param name="techchoice">Enum <c>GenerationTechnique</c> specifies the technique used to generate random data. <c>LocalEntropicSecureRand</c> is the preferred choice.</param>
 		*/
 		static void GenerateKey(array<uint8>^ key, uint8 keybytelen, GenerationTechnique techchoice);
-		static void GenerateKey(uint8*& key, uint8 keybytelen, GenerationTechnique techchoice); //key array will be allocated if null.
+		/** 
+			<summary>
+			Generates a new random Key or IV into the key array.
+			<para>The key array will be allocated if null.</para>
+			</summary> 
+			<param name="key">Byte array to be filled with generated data.</param>
+			<param name="keybytelen">Length of the array in bytes. Recommended values can be found by calling <c>RequiredKeyByteLength()</c> and <c>RequiredIVByteLength()</c>.</param>
+			<param name="techchoice">Enum <c>GenerationTechnique</c> specifies the technique used to generate random data. <c>LocalEntropicSecureRand</c> is the preferred choice.</param>
+		*/
+		static void GenerateKey(uint8*& key, uint8 keybytelen, GenerationTechnique techchoice);
 
 		/**
 			<summary>
@@ -163,6 +181,19 @@ namespace cipup {
 			<returns>A MessageCode signifying success or reason for failure. Consult <c>engine.Messages</c> for a description of each code.</returns>
 		*/
 		MessageCode init( InitAction action, IO::Stream^ output, array<uint8>^ key, uint8 keybytelen, array<uint8>^ iv, uint8 ivbytelen );
+		/** 
+			<summary>
+			Initializes the engine for encryption or decryption to a stringstream with a Key and IV.
+			<para>There is an overloaded method for writing to a file.</para>
+			</summary> 
+			<param name="action">Enum <c>InitAction</c> specifing initialization for encryption or decryption.</param>
+			<param name="output">Output will be directed to this stringstream.</param>
+			<param name="key">Byte array containing the Key.</param>
+			<param name="keybytelen">Length of the Key array in bytes. Required values can be found by calling <c>RequiredKeyByteLength()</c>.</param>
+			<param name="iv">Byte array containing the IV.</param>
+			<param name="ivbytelen">Length of the IV array in bytes. Required values can be found by calling <c>RequiredIVByteLength()</c>.</param>
+			<returns>A MessageCode signifying success or reason for failure. Consult <c>engine.Messages</c> for a description of each code.</returns>
+		*/
 		MessageCode init( InitAction action, ostringstream* output, uint8* key, uint8 keybytelen, uint8* iv, uint8 ivbytelen );
 		/** 
 			<summary>
@@ -180,6 +211,21 @@ namespace cipup {
 			<returns>A MessageCode signifying success or reason for failure. Consult <c>engine.Messages</c> for a description of each code.</returns>
 		*/
 		MessageCode init( InitAction action, const char* filename, bool append, array<uint8>^ key, uint8 keybytelen, array<uint8>^ iv, uint8 ivbytelen );
+		/** 
+			<summary>
+			Initializes the engine for encryption or decryption to a file with a Key and IV.
+			<para>There is an overloaded method for writing to a stringstream.</para>
+			<para>This method will open the file designated, and append to an existing file if so directed.</para>
+			</summary> 
+			<param name="action">Enum <c>InitAction</c> specifing initialization for encryption or decryption.</param>
+			<param name="filename">Output will be directed to the file designated by this path.</param>
+			<param name="append">Specifies wheter to append to the file.</param>
+			<param name="key">Byte array containing the Key.</param>
+			<param name="keybytelen">Length of the Key array in bytes. Required values can be found by calling <c>RequiredKeyByteLength()</c>.</param>
+			<param name="iv">Byte array containing the IV.</param>
+			<param name="ivbytelen">Length of the IV array in bytes. Required values can be found by calling <c>RequiredIVByteLength()</c>.</param>
+			<returns>A MessageCode signifying success or reason for failure. Consult <c>engine.Messages</c> for a description of each code.</returns>
+		*/
 		MessageCode init( InitAction action, const char* filename, bool append, uint8* key, uint8 keybytelen, uint8* iv, uint8 ivbytelen );
 		/**
 			<summary>
@@ -216,6 +262,19 @@ namespace cipup {
 				if the last bits were part of a character's encoding.</exception>
 		*/
 		void decrypt( IO::Stream^ input );
+		/**
+			<summary>
+			Decrypts the contents of a stream to the initialized output.
+			<para>Consumes the entire stream, but only decrypts one (the first) message.</para>
+			<para>If the stream ends before a terminal character in the message is encountered, 
+				then either the message will be cut off or an exception will be thrown.</para>
+			<para>Use <c>canread()</c> to determine if this action can be performed.</para>
+			<para>Use <c>bytesread()</c> for the number of bytes of plaintext decrypted from the cyphertext.</para>
+			</summary>
+			<param name="input">istream of cyphertext containing one message.</param>
+			<exception cref="Exception">Thrown when the stream ends before a terminal character in the message is encountered, 
+				if the last bits were part of a character's encoding.</exception>
+		*/
 		void decrypt( istream& input );
 		/**
 			<summary>
@@ -231,6 +290,19 @@ namespace cipup {
 				if the last bits were part of a character's encoding.</exception>
 		*/
 		static void operator>> ( engine% a, IO::Stream^ input );
+		/**
+			<summary>
+			Decrypts the contents of a stream to the initialized output.
+			<para>Consumes the entire stream, but only decrypts one (the first) message.</para>
+			<para>If the stream ends before a terminal character in the message is encountered, 
+				then either the message will be cut off or an exception will be thrown.</para>
+			<para>Use <c>canread()</c> to determine if this action can be performed.</para>
+			<para>Use <c>bytesread()</c> for the number of bytes of plaintext decrypted from the cyphertext.</para>
+			</summary>
+			<param name="input">istream of cyphertext containing one message.</param>
+			<exception cref="Exception">Thrown when the stream ends before a terminal character in the message is encountered, 
+				if the last bits were part of a character's encoding.</exception>
+		*/
 		static void operator>> ( engine% a, istream& input );
 
 		/**
@@ -263,7 +335,31 @@ namespace cipup {
 			</summary>
 			<param name="datum">Byte of plaintext</param>
 		*/
-		void encrypt( uint8% datum );
+		void encrypt( uint8 datum );
+		/**
+			<summary>
+			Encrypts a single byte to the initialized output.
+			<para>You can incrementally encrypt messages by feeding <c>encrypt()</c> data chunks.
+				If you are writing to a stringstream, you can optionally terminate a message using <c>flush()</c>.
+				If you want additional messages sequentially linked, you can reuse <c>encrypt()</c> after calling <c>flush()</c>.</para>
+			<para>Use <c>canwrite()</c> to determine if this action can be performed.</para>
+			<para>Use <c>bitswritten()</c> for the number of bits of cyphertext generated from the plaintext (non-buffered bits already written to the output).</para>
+			</summary>
+			<param name="datum">Pointer to byte of plaintext</param>
+		*/
+		void encrypt( uint8* datum );
+		/**
+			<summary>
+			Encrypts a single byte to the initialized output.
+			<para>You can incrementally encrypt messages by feeding <c>encrypt()</c> data chunks.
+				If you are writing to a stringstream, you can optionally terminate a message using <c>flush()</c>.
+				If you want additional messages sequentially linked, you can reuse <c>encrypt()</c> after calling <c>flush()</c>.</para>
+			<para>Use <c>canwrite()</c> to determine if this action can be performed.</para>
+			<para>Use <c>bitswritten()</c> for the number of bits of cyphertext generated from the plaintext (non-buffered bits already written to the output).</para>
+			</summary>
+			<param name="datum">Pointer to byte of plaintext</param>
+		*/
+		static void operator<< ( engine% a, uint8* datum );
 		/**
 			<summary>
 			Encrypts a single byte to the initialized output.
@@ -275,7 +371,7 @@ namespace cipup {
 			</summary>
 			<param name="datum">Byte of plaintext</param>
 		*/
-		static void operator<< ( engine% a, uint8% datum );
+		static void operator<< ( engine% a, uint8& datum );
 		/**
 			<summary>
 			Encrypts the contents of a vector of bytes to the initialized output.
@@ -288,6 +384,17 @@ namespace cipup {
 			<param name="data">Byte array of plaintext</param>
 		*/
 		void encrypt( array<uint8>^ data );
+		/**
+			<summary>
+			Encrypts the contents of a vector of bytes to the initialized output.
+			<para>You can incrementally encrypt messages by feeding <c>encrypt()</c> data chunks.
+				If you are writing to a stringstream, you can optionally terminate a message using <c>flush()</c>.
+				If you want additional messages sequentially linked, you can reuse <c>encrypt()</c> after calling <c>flush()</c>.</para>
+			<para>Use <c>canwrite()</c> to determine if this action can be performed.</para>
+			<para>Use <c>bitswritten()</c> for the number of bits of cyphertext generated from the plaintext (non-buffered bits already written to the output).</para>
+			</summary>
+			<param name="data">Vector of bytes of plaintext</param>
+		*/
 		void encrypt( std::vector< uint8 >& data );
 		/**
 			<summary>
@@ -301,6 +408,17 @@ namespace cipup {
 			<param name="data">Byte array of plaintext</param>
 		*/
 		static void operator<< ( engine% a, array<uint8>^ data );
+		/**
+			<summary>
+			Encrypts the contents of a vector of bytes to the initialized output.
+			<para>You can incrementally encrypt messages by feeding <c>encrypt()</c> data chunks.
+				If you are writing to a stringstream, you can optionally terminate a message using <c>flush()</c>.
+				If you want additional messages sequentially linked, you can reuse <c>encrypt()</c> after calling <c>flush()</c>.</para>
+			<para>Use <c>canwrite()</c> to determine if this action can be performed.</para>
+			<para>Use <c>bitswritten()</c> for the number of bits of cyphertext generated from the plaintext (non-buffered bits already written to the output).</para>
+			</summary>
+			<param name="data">Vector of bytes of plaintext</param>
+		*/
 		static void operator<< ( engine% a, std::vector< uint8 >& data );
 		/**
 			<summary>
@@ -315,6 +433,18 @@ namespace cipup {
 			<param name="input">Stream of plaintext</param>			
 		*/
 		void encrypt( IO::Stream^ input );
+		/**
+			<summary>
+			Encrypts the contents of a stream to the initialized output.
+			<para>Consumes the entire stream, building into the current (single) message.</para>
+			<para>You can incrementally encrypt messages by feeding <c>encrypt()</c> data chunks.
+				If you are writing to a stringstream, you can optionally terminate a message using <c>flush()</c>.
+				If you want additional messages sequentially linked, you can reuse <c>encrypt()</c> after calling <c>flush()</c>.</para>
+			<para>Use <c>canwrite()</c> to determine if this action can be performed.</para>
+			<para>Use <c>bitswritten()</c> for the number of bits of cyphertext generated from the plaintext (non-buffered bits already written to the output).</para>
+			</summary>
+			<param name="input">istream of plaintext</param>			
+		*/
 		void encrypt( istream& input );
 		/**
 			<summary>
@@ -329,6 +459,18 @@ namespace cipup {
 			<param name="input">Stream of plaintext</param>
 		*/
 		static void operator<< ( engine% a, IO::Stream^ input );
+		/**
+			<summary>
+			Encrypts the contents of a stream to the initialized output.
+			<para>Consumes the entire stream, building into the current (single) message.</para>
+			<para>You can incrementally encrypt messages by feeding <c>encrypt()</c> data chunks.
+				If you are writing to a stringstream, you can optionally terminate a message using <c>flush()</c>.
+				If you want additional messages sequentially linked, you can reuse <c>encrypt()</c> after calling <c>flush()</c>.</para>
+			<para>Use <c>canwrite()</c> to determine if this action can be performed.</para>
+			<para>Use <c>bitswritten()</c> for the number of bits of cyphertext generated from the plaintext (non-buffered bits already written to the output).</para>
+			</summary>
+			<param name="input">istream of plaintext</param>
+		*/
 		static void operator<< ( engine% a, istream& input );
 		/**
 			<summary>
