@@ -15,129 +15,877 @@
 ================================================================*/
 
 // cipup.cpp
+#include "cipup.hpp"
+#include "engine_internal.hpp"
 
 #include <iostream>
 #include <fstream>
 #include <exception>
 #include <cstdlib>
-//#include <time.h>
-#include "cipup.hpp"
-#include "engine_internal.hpp"
+#include <ctime>
 
+using namespace System;
 using namespace std;
 using namespace Costella::Bitstream;
 
 namespace cipup {
 
-	static char* VERSION_NUMBER = "0.003";
+	static char* VERSION_NUMBER = "0.90";
 
-	String^ GetVersionText()
+	String^ engine::GetVersionText()
 	{
 		return String::Concat("CIPUP v", gcnew String(VERSION_NUMBER));
 	}
 
-	void PrintVersionText()
+	void engine::PrintVersionText()
 	{
-		Console::Write( String::Concat("CIPUP v", gcnew String(VERSION_NUMBER)) );
+		Console::Write( GetVersionText() );
 	}
 
-	uint8 RequiredKeyByteLength(void)
+	String^ engine::GetConfiguration()
+	{
+		stringstream retval;
+#ifdef SHRINK_CYPHERTEXT
+		retval << "Shrinked Cyphertext. ";
+#endif
+
+#ifdef RANDOM_LOTTERY
+		retval << "Random Lottery. ";
+#endif
+
+#if KEYSTREAMBUFFERSIZE == 16
+		retval << "Full buffer. ";
+#elif KEYSTREAMBUFFERSIZE == 1
+		retval << "Minimal buffer. ";
+#endif
+
+#if CHAR_SET_SIZE == 256
+		retval << "Full byte character set. ";
+#elif CHAR_SET_SIZE == 16
+		retval << "Half-byte character set. ";
+#endif
+		return String::String(retval.str().c_str()).ToString();
+	}
+
+	void engine::PrintConfiguration()
+	{
+		Console::Write( GetConfiguration() );
+	}
+
+	uint8 engine::RequiredKeyByteLength(void)
 	{
 		return KEYSIZEINBYTES;
 	}
 
-	uint8 RequiredIVByteLength(void)
+	uint8 engine::RequiredIVByteLength(void)
 	{
 		return IVSIZEINBYTES;
 	}
 
+	void engine::GenerateKey(array<uint8>^ key, uint8 keybytelen)
+	{
+		GenerateKey(key, keybytelen, GenerationTechnique::LocalEntropicSecureRand);
+	}
+
+	void engine::GenerateKey(uint8*& key, uint8 keybytelen)
+	{
+		GenerateKey(key, keybytelen, GenerationTechnique::LocalEntropicSecureRand);
+	}
+
+	void engine::GenerateKey(array<uint8>^ key, uint8 keybytelen, GenerationTechnique techchoice)
+	{
+		if ( key == nullptr )
+		{
+			return;
+		}
+
+		//Convert the data type to unmanaged
+		uint8* internalKey = new uint8[keybytelen];
+
+		GenerateKey(internalKey, keybytelen, techchoice);
+
+		//Push the data back into the managed type
+		for ( uint8 itr = 0; itr < keybytelen; itr++ )
+		{
+			key[itr] = internalKey[itr];
+		}
+	}
+
+	void engine::GenerateKey(uint8*& key, uint8 keybytelen, GenerationTechnique techchoice)
+	{
+		
+		if ( key == NULL )
+		{
+			key = new uint8[keybytelen];
+		}
+
+		if ( techchoice == GenerationTechnique::LocalSimpleRand )
+		{
+			srand ( (uint32) time(NULL) );
+			for ( keybytelen-- ; keybytelen >= 0; keybytelen-- )
+			{
+				key[keybytelen] = (uint8) ( ( ( (double)rand() / ( (double)UINT_MAX + 1.0) ) *  (double)UCHAR_MAX ) / 1 );
+			}
+		}
+		else if ( techchoice == GenerationTechnique::LocalJumpingSimpleRand )
+		{
+			srand ( (uint32) time(NULL) );
+			for ( keybytelen-- ; keybytelen >= 0; keybytelen-- )
+			{
+				key[keybytelen] = (uint8) ( ( ( (double)rand() / ( (double)UINT_MAX + 1.0) ) *  (double)UCHAR_MAX ) / 1 );
+				srand ( rand() );
+			}
+		}
+		else if ( techchoice == GenerationTechnique::LocalSecureRand )
+		{
+			uint32 number;
+			for ( keybytelen-- ; keybytelen >= 0; keybytelen-- )
+			{
+				rand_s( &number );
+				key[keybytelen] = (uint8) ( ( ( (double)number / ( (double)UINT_MAX + 1.0) ) *  (double)UCHAR_MAX ) / 1 );
+			}
+		}
+		else if ( techchoice == GenerationTechnique::LocalEntropicSecureRand )
+		{
+			HCRYPTPROV hProvider;
+			if (CryptAcquireContext(&hProvider, 0, 0, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
+			{
+				CryptGenRandom(hProvider, keybytelen, key);
+			}
+		}
+	}
+
+	engine::engine()
+	{
+		cpInternal = gcnew engine_internal();
+
+		return;
+	}
+
+	engine::~engine()
+	{
+		finalize();
+
+		delete cpInternal;
+		return;
+	}
+
+	bool engine::canread()
+	{
+		return ( ( cpInternal->eStatus == Ready ) && ( cpInternal->eInitType == InitRead ) );
+	}
+	bool engine::canwrite()
+	{
+		return ( ( cpInternal->eStatus != NotReady ) && ( cpInternal->eInitType == InitWrite ) );
+	}
+	bool engine::ready()
+	{
+		return ( ( cpInternal->eStatus != NotReady ) && ( cpInternal->eInitType != NotInit ) );
+	}
+
+	uint64 engine::bytesread()
+	{
+		return cpInternal->ui64BytesRead;
+	}
+
+	uint64 engine::bitswritten()
+	{
+		return cpInternal->ui64BitsWritten;
+	}
+	uint64 engine::byteswritten()
+	{
+		return (cpInternal->ui64BitsWritten)/8;
+	}
+	uint8 engine::overflowbits()
+	{
+		return (uint8)((cpInternal->ui64BitsWritten)%8);
+	}
+
+	MessageCode engine::init( InitAction action, IO::Stream^ output, array<uint8>^ key, uint8 keybytelen, array<uint8>^ iv, uint8 ivbytelen )
+	{
+		if ( cpInternal->eStatus == NotReady )
+		{
+			if ( keybytelen != KEYSIZEINBYTES )
+			{
+				return MessageCode::InitFailureInvalidKeyLength;
+			}
+			if ( ivbytelen != IVSIZEINBYTES )
+			{
+				return MessageCode::InitFailureInvalidIVLength;
+			}
+
+			//Convert the data type to unmanaged
+			uint8* internalKey = new uint8[keybytelen];
+			uint8* internalIV = new uint8[ivbytelen];
+			for ( uint8 itr = 0; itr < keybytelen; itr++ )
+			{
+				internalKey[itr] = key[itr];
+			}
+			for ( uint8 itr = 0; itr < ivbytelen; itr++ )
+			{
+				internalIV[itr] = iv[itr];
+			}
+
+			if ( action == InitAction::InitDecrypt )
+			{
+				//Build PRNG
+				cpInternal->RabbitPRNGState = new ECRYPT_ctx;
+				ECRYPT_init();
+				ECRYPT_keysetup(cpInternal->RabbitPRNGState, internalKey, keybytelen*8, ivbytelen*8); //bit size of key and iv
+				ECRYPT_ivsetup(cpInternal->RabbitPRNGState, internalIV);
+
+				//Build HuffmanEngine
+				cpInternal->cpHuffmanGearbox = new huffman_gearbox( InitRead, cpInternal->RabbitPRNGState );
+
+				cpInternal->eInitType = InitRead;
+			}
+			else if ( action == InitAction::InitEncrypt )
+			{
+				//Build PRNG
+				cpInternal->RabbitPRNGState = new ECRYPT_ctx;
+				ECRYPT_init();
+				ECRYPT_keysetup(cpInternal->RabbitPRNGState, internalKey, keybytelen*8, ivbytelen*8); //bit size of key and iv
+				ECRYPT_ivsetup(cpInternal->RabbitPRNGState, internalIV);
+
+				//Build HuffmanEngine
+				cpInternal->cpHuffmanGearbox = new huffman_gearbox( InitWrite, cpInternal->RabbitPRNGState );
+
+				//Clear bitstream
+				cpInternal->bsBitBufferIn->flush();
+				cpInternal->ssBitBufferOut->str( string() );
+				cpInternal->ssBitBufferOut->clear();
+
+				cpInternal->eInitType = InitWrite;
+			}
+			else
+			{
+				return MessageCode::InitFailureInvalidAction;
+			}
+
+			cpInternal->eDestType = DestStream;
+
+			cpInternal->output = output;
+
+			cpInternal->ui64BitsWritten = 0;
+			cpInternal->ui64BytesRead = 0;
+
+		}
+		else
+		{
+			return MessageCode::InitFailureNeedFinalize;
+		}
+
+		//Set status
+		cpInternal->eStatus = Ready;
+
+		return MessageCode::InitSuccess;
+	}
+
+	MessageCode engine::init( InitAction action, ostringstream* output, uint8* key, uint8 keybytelen, uint8* iv, uint8 ivbytelen )
+	{
+		if ( cpInternal->eStatus == NotReady )
+		{
+			if ( keybytelen != KEYSIZEINBYTES )
+			{
+				return MessageCode::InitFailureInvalidKeyLength;
+			}
+			if ( ivbytelen != IVSIZEINBYTES )
+			{
+				return MessageCode::InitFailureInvalidIVLength;
+			}
+
+			if ( action == InitAction::InitDecrypt )
+			{
+				//Build PRNG
+				cpInternal->RabbitPRNGState = new ECRYPT_ctx;
+				ECRYPT_init();
+				ECRYPT_keysetup(cpInternal->RabbitPRNGState, key, keybytelen*8, ivbytelen*8); //bit size of key and iv
+				ECRYPT_ivsetup(cpInternal->RabbitPRNGState, iv);
+
+				//Build HuffmanEngine
+				cpInternal->cpHuffmanGearbox = new huffman_gearbox( InitRead, cpInternal->RabbitPRNGState );
+
+				cpInternal->eInitType = InitRead;
+			}
+			else if ( action == InitAction::InitEncrypt )
+			{
+				//Build PRNG
+				cpInternal->RabbitPRNGState = new ECRYPT_ctx;
+				ECRYPT_init();
+				ECRYPT_keysetup(cpInternal->RabbitPRNGState, key, keybytelen*8, ivbytelen*8); //bit size of key and iv
+				ECRYPT_ivsetup(cpInternal->RabbitPRNGState, iv);
+
+				//Build HuffmanEngine
+				cpInternal->cpHuffmanGearbox = new huffman_gearbox( InitWrite, cpInternal->RabbitPRNGState );
+
+				//Clear bitstream
+				cpInternal->bsBitBufferIn->flush();
+				cpInternal->ssBitBufferOut->str( string() );
+				cpInternal->ssBitBufferOut->clear();
+
+				//Prepare output stream for cyphertext
+				output->str( string() );
+				output->clear();
+
+				cpInternal->eInitType = InitWrite;
+			}
+			else
+			{
+				return MessageCode::InitFailureInvalidAction;
+			}
+
+			cpInternal->eDestType = DestStream;
+			ostreamManagedWrapper^ tempWrapper = gcnew ostreamManagedWrapper(output);
+			cpInternal->output = tempWrapper;
+			cpInternal->outputWrapped = true;
+
+			cpInternal->ui64BitsWritten = 0;
+			cpInternal->ui64BytesRead = 0;
+
+		}
+		else
+		{
+			return MessageCode::InitFailureNeedFinalize;
+		}
+
+		//Set status
+		cpInternal->eStatus = Ready;
+
+		return MessageCode::InitSuccess;		
+	}
+
+	MessageCode engine::init( InitAction action, const char* filename, bool append, array<uint8>^ key, uint8 keybytelen, array<uint8>^ iv, uint8 ivbytelen )
+	{
+		if ( cpInternal->eStatus == NotReady )
+		{
+			if ( keybytelen != KEYSIZEINBYTES )
+			{
+				return MessageCode::InitFailureInvalidKeyLength;
+			}
+			if ( ivbytelen != IVSIZEINBYTES )
+			{
+				return MessageCode::InitFailureInvalidIVLength;
+			}
+
+			//Convert the data type to unmanaged
+			uint8* internalKey = new uint8[keybytelen];
+			uint8* internalIV = new uint8[ivbytelen];
+			for ( uint8 itr = 0; itr < keybytelen; itr++ )
+			{
+				internalKey[itr] = key[itr];
+			}
+			for ( uint8 itr = 0; itr < ivbytelen; itr++ )
+			{
+				internalIV[itr] = iv[itr];
+			}
+
+			return init(action, filename, append, internalKey, keybytelen, internalIV, ivbytelen);
+		}
+		else
+		{
+			return MessageCode::InitFailureNeedFinalize;
+		}
+
+	}
+
+	MessageCode engine::init( InitAction action, const char* filename, bool append, uint8* key, uint8 keybytelen, uint8* iv, uint8 ivbytelen )
+	{
+		if ( cpInternal->eStatus == NotReady )
+		{
+			if ( keybytelen != KEYSIZEINBYTES )
+			{
+				return MessageCode::InitFailureInvalidKeyLength;
+			}
+			if ( ivbytelen != IVSIZEINBYTES )
+			{
+				return MessageCode::InitFailureInvalidIVLength;
+			}
+
+			if ( action == InitAction::InitDecrypt )
+			{
+				ofstream* temp = new ofstream();
+				if ( append )
+				{
+					temp->open(filename, ios::out | ios::app);
+				}
+				else
+				{
+					temp->open(filename);
+				}
+
+				if ( temp->fail() )
+				{
+					delete temp;
+					return MessageCode::InitFailureFileError;
+				}
+
+				ostreamManagedWrapper^ tempWrapper = gcnew ostreamManagedWrapper(temp);
+				cpInternal->output = tempWrapper;
+				cpInternal->outputWrapped = true;
+
+				//Build PRNG
+				cpInternal->RabbitPRNGState = new ECRYPT_ctx;
+				ECRYPT_init();
+				ECRYPT_keysetup(cpInternal->RabbitPRNGState, key, keybytelen*8, ivbytelen*8); //bit size of key and iv
+				ECRYPT_ivsetup(cpInternal->RabbitPRNGState, iv);
+
+				//Build HuffmanEngine
+				cpInternal->cpHuffmanGearbox = new huffman_gearbox( InitRead, cpInternal->RabbitPRNGState );
+
+				cpInternal->eInitType = InitRead;
+			}
+			else if ( action == InitAction::InitEncrypt )
+			{
+				ofstream* temp = new ofstream();
+				if ( append )
+				{
+					temp->open(filename, ios::out | ios::app);
+				}
+				else
+				{
+					temp->open(filename);
+				}
+
+				if ( temp->fail() )
+				{
+					delete temp;
+					return MessageCode::InitFailureFileError;
+				}
+
+				ostreamManagedWrapper^ tempWrapper = gcnew ostreamManagedWrapper(temp);
+				cpInternal->output = tempWrapper;
+				cpInternal->outputWrapped = true;
+
+				//Build PRNG
+				cpInternal->RabbitPRNGState = new ECRYPT_ctx;
+				ECRYPT_init();
+				ECRYPT_keysetup(cpInternal->RabbitPRNGState, key, keybytelen*8, ivbytelen*8); //bit size of key and iv
+				ECRYPT_ivsetup(cpInternal->RabbitPRNGState, iv);
+
+				//Build HuffmanEngine
+				cpInternal->cpHuffmanGearbox = new huffman_gearbox( InitWrite, cpInternal->RabbitPRNGState );
+
+				//Clear bitstream
+				cpInternal->bsBitBufferIn->flush();
+				cpInternal->ssBitBufferOut->str( string() );
+				cpInternal->ssBitBufferOut->clear();
+
+				cpInternal->eInitType = InitWrite;
+			}
+			else
+			{
+				return MessageCode::InitFailureInvalidAction;
+			}
+
+			cpInternal->eDestType = DestFile;
+
+			cpInternal->ui64BitsWritten = 0;
+			cpInternal->ui64BytesRead = 0;
+
+		}
+		else
+		{
+			return MessageCode::InitFailureNeedFinalize;
+		}
+
+		//Set status
+		cpInternal->eStatus = Ready;
+
+		return MessageCode::InitSuccess;		
+	}
+	
+	void engine::decrypt( IO::Stream^ input )
+	{
+		if ( cpInternal->eInitType == InitRead )
+		{
+			if ( cpInternal->eStatus == Ready )
+			{
+				if ( input->CanRead )
+				{					
+					array<uint8>^ inputBuf = gcnew array<uint8>(ECRYPT_BLOCKLENGTH);
+					//input is cryptext
+					uint8 cryptext[ECRYPT_BLOCKLENGTH]; //cryptext input buffer for PRNG
+					uint8 middletext[ECRYPT_BLOCKLENGTH]; //middletext output buffer for PRNG
+					stringstream MiddleTextBuf; //middletext input buffer for huffman gearbox
+					//output is plaintext
+					long long numBytesToRead = inputBuf->Length;
+					int n, itr;
+					//XOR entire stream
+					while (numBytesToRead > 0)
+					{
+						// Read may return anything from 0 to ECRYPT_BLOCKLENGTH.
+						n = input->Read(inputBuf, 0, ECRYPT_BLOCKLENGTH);
+						// The end of the file is reached.
+						if (n == 0)
+						{
+							break;
+						}
+						else if ( n == ECRYPT_BLOCKLENGTH )
+						{
+							//Full block
+							for (itr=0; itr<ECRYPT_BLOCKLENGTH; itr--)
+							{
+								cryptext[itr] = inputBuf[itr];
+							}
+							ECRYPT_decrypt_blocks(cpInternal->RabbitPRNGState, cryptext, middletext, 1); //XOR
+							MiddleTextBuf.write((char*)middletext, ECRYPT_BLOCKLENGTH); //Dump into buffer
+						}
+						else
+						{
+							//Remaining bytes
+							for (itr=0; itr<n; itr--)
+							{
+								cryptext[itr] = inputBuf[itr];
+							}
+							ECRYPT_decrypt_bytes(cpInternal->RabbitPRNGState, cryptext, middletext, n ); //XOR
+							MiddleTextBuf.write((char*)middletext, n ); //Dump into buffer, finishing message
+							break;
+						}
+						numBytesToRead -= (long long)n;
+					}
+					
+					//Feed middletext into huffman gearbox
+					cpInternal->cpHuffmanGearbox->decode( MiddleTextBuf, cpInternal->output, cpInternal->outputWrapped, cpInternal->ui64BytesRead ); //Plaintext is feed directly into output stream
+				}
+			}
+		}
+	}
+
+	void engine::decrypt( istream& input )
+	{
+		if ( cpInternal->eInitType == InitRead )
+		{
+			if ( cpInternal->eStatus == Ready )
+			{
+				//input is cryptext
+				uint8 cryptext[ECRYPT_BLOCKLENGTH]; //cryptext input buffer for PRNG
+				uint8 middletext[ECRYPT_BLOCKLENGTH]; //middletext output buffer for PRNG
+				stringstream MiddleTextBuf; //middletext input buffer for huffman gearbox
+				//output is plaintext
+				
+				//XOR entire stream
+				while ( !input.eof() )
+				{
+					input.read((char*)cryptext, ECRYPT_BLOCKLENGTH); //Try to pull a block into buffer
+
+					if ( input.gcount() == 0 )
+					{
+						break;
+					}
+					else if ( input.gcount() == ECRYPT_BLOCKLENGTH )
+					{
+						//Full block
+						ECRYPT_decrypt_blocks(cpInternal->RabbitPRNGState, cryptext, middletext, 1); //XOR
+						MiddleTextBuf.write((char*)middletext, ECRYPT_BLOCKLENGTH); //Dump into buffer
+					}
+					else
+					{
+						//Remaining bytes
+						ECRYPT_decrypt_bytes(cpInternal->RabbitPRNGState, cryptext, middletext, input.gcount() ); //XOR
+						MiddleTextBuf.write((char*)middletext, input.gcount() ); //Dump into buffer, finishing message
+						break;
+					}
+
+				}
+								
+				//Feed middletext into huffman gearbox
+				cpInternal->cpHuffmanGearbox->decode( MiddleTextBuf, cpInternal->output, cpInternal->outputWrapped, cpInternal->ui64BytesRead ); //Plaintext is feed directly into output stream
+			}
+		}
+	}
+
+	void engine::operator>> ( engine% a, IO::Stream^ input )
+	{
+		a.decrypt(input);
+	}
+
+	void engine::operator>> ( engine% a, istream& input )
+	{
+		a.decrypt(input);
+	}
+
+	void engine::encrypt( uint8% datum )
+	{
+		if ( cpInternal->eInitType == InitWrite )
+		{
+			if ( cpInternal->eStatus == SemiReady )
+			{
+				if ( cpInternal->outputWrapped )
+				{
+					//Clear output stream
+					((ostreamManagedWrapper^)(cpInternal->output))->str( string() );
+					((ostreamManagedWrapper^)(cpInternal->output))->clear();
+				}
+
+				//Reset size
+				cpInternal->ui64BitsWritten = 0;
+				//Set status
+				cpInternal->eStatus = Ready;
+			}
+
+			if ( cpInternal->eStatus == Ready )
+			{
+				//Encode datum byte in huffman gearbox into bit buffer
+				cpInternal->cpHuffmanGearbox->encode( datum, cpInternal->bsBitBufferIn, cpInternal->ui16BitsBuffered );
+				
+				//Consume full blocks from bit buffer if available, XORing and feeding to output
+				if ( cpInternal->ui16BitsBuffered >= ECRYPT_BLOCKLENGTH*8 )
+				{
+					//ssBitBufferOut is middletext
+					uint8 middletext[ECRYPT_BLOCKLENGTH]; //middletext input buffer for PRNG
+					uint8 cryptext[ECRYPT_BLOCKLENGTH]; //cryptext output buffer for PRNG
+					//output is cryptext
+					array<uint8>^ outputBuf = gcnew array<uint8>(ECRYPT_BLOCKLENGTH);
+					int itr;
+
+					do
+					{
+						cpInternal->ssBitBufferOut->read(middletext, ECRYPT_BLOCKLENGTH); //Pull a block into buffer
+						ECRYPT_encrypt_blocks(cpInternal->RabbitPRNGState, middletext, cryptext, 1); //XOR
+						cpInternal->ui64BitsWritten += ECRYPT_BLOCKLENGTH*8;
+						cpInternal->ui16BitsBuffered -= ECRYPT_BLOCKLENGTH*8; //Mark bit buffer reduction
+						if ( cpInternal->outputWrapped )
+						{
+							((ostreamManagedWrapper^)(cpInternal->output))->write(cryptext, ECRYPT_BLOCKLENGTH); //Dump into output
+						}
+						else
+						{
+							for (itr=0; itr<ECRYPT_BLOCKLENGTH; itr--)
+							{
+								outputBuf[itr] = cryptext[itr];
+							}
+							cpInternal->output->Write(outputBuf,0,ECRYPT_BLOCKLENGTH);
+						}
+
+					} while ( cpInternal->ui16BitsBuffered >= ECRYPT_BLOCKLENGTH*8 );
+				}
+			}
+		}
+
+	}
+
+	void engine::operator<< ( engine% a, uint8% datum )
+	{
+		a.encrypt(datum);
+	}	
+
+	void engine::encrypt( array<uint8>^ data )
+	{
+		for (int i=0; i<data->Length; i++)
+			encrypt(data[i]);
+	}
+
+	void engine::encrypt( std::vector< uint8 >& data )
+	{
+		for (uint32 i=0; i<data.size(); i++)
+			encrypt(data.at(i));
+	}
+
+	void engine::operator<< ( engine% a, array<uint8>^ data )
+	{
+		a.encrypt(data);
+	}
+
+	void engine::operator<< ( engine% a, std::vector< uint8 >& data )
+	{
+		a.encrypt(data);
+	}
+
+	void engine::encrypt( IO::Stream^ input )
+	{
+		if ( cpInternal->eInitType == InitWrite )
+		{
+			if ( cpInternal->eStatus == SemiReady )
+			{
+				if ( cpInternal->outputWrapped )
+				{
+					//Clear output stream
+					((ostreamManagedWrapper^)(cpInternal->output))->str( string() );
+					((ostreamManagedWrapper^)(cpInternal->output))->clear();
+				}
+
+				//Reset size
+				cpInternal->ui64BitsWritten = 0;
+				//Set status
+				cpInternal->eStatus = Ready;
+			}
+
+			if ( cpInternal->eStatus == Ready )
+			{
+				if ( input->CanRead )
+				{
+					array<uint8>^ inputBuf = gcnew array<uint8>(1);
+					long long numBytesToRead = inputBuf->Length;
+					int n;
+					uint8 temp;
+					while (numBytesToRead > 0)
+					{
+						// Read may return anything from 0 to 1.
+						n = input->Read(inputBuf, 0, 1);
+						// The end of the file is reached.
+						if (n == 0)
+						{
+							break;
+						}
+						else
+						{
+							temp = inputBuf[0];
+							encrypt(temp);							
+						}
+						numBytesToRead -= (long long)n;
+					}
+					temp = 0;
+				}
+			}
+		}
+	}
+
+	void engine::encrypt( istream& input )
+	{
+		if ( cpInternal->eInitType == InitWrite )
+		{
+			if ( cpInternal->eStatus == SemiReady )
+			{
+				if ( cpInternal->outputWrapped )
+				{
+					//Clear output stream
+					((ostreamManagedWrapper^)(cpInternal->output))->str( string() );
+					((ostreamManagedWrapper^)(cpInternal->output))->clear();
+				}
+
+				//Reset size
+				cpInternal->ui64BitsWritten = 0;
+				//Set status
+				cpInternal->eStatus = Ready;
+			}
+
+			if ( cpInternal->eStatus == Ready )
+			{
+				uint8 curDatum;
+
+				//Consume entire stream
+				while ( !input.eof() )
+				{
+					input >> curDatum;
+
+					encrypt(curDatum);
+				}
+
+				curDatum = 0; //Wipe data before it goes out of scope
+
+			}
+		}
+	}
+
+	void engine::operator<< ( engine% a, IO::Stream^ input )
+	{
+		a.encrypt(input);
+	}
+
+	void engine::operator<< ( engine% a, istream& input )
+	{
+		a.encrypt(input);
+	}
+
+	void engine::flush()
+	{
+		if ( cpInternal->eInitType == InitWrite )
+		{
+			if ( cpInternal->eDestType == DestStream )
+			{
+				if ( cpInternal->eStatus == Ready )
+				{
+					//Dump bit buffer into output
+					cpInternal->flush(); // Internal flush
+
+					//Reset bit buffer
+					cpInternal->ssBitBufferOut->str( string() );
+					cpInternal->ssBitBufferOut->clear();
+
+					//Set status
+					cpInternal->eStatus = SemiReady;
+				}
+			}
+		}
+
+	}
+
+	void engine::finalize()
+	{
+		if ( cpInternal->eStatus != NotReady )
+		{
+			cpInternal->outputWrapped = false;
+
+			if ( cpInternal->eInitType == InitWrite )
+			{
+				if ( cpInternal->eStatus == Ready )
+				{
+					cpInternal->flush(); //Internal flush
+				}
+			}
+			//else if ( cpInternal->eInitType == InitRead )
+
+			if ( cpInternal->eDestType == DestFile )
+			{
+				((ostreamManagedWrapper^)(cpInternal->output))->close();
+				((ostreamManagedWrapper^)(cpInternal->output))->delfileptr();
+			}
+			//else if ( cpInternal->eDestType == DestStream ) { }
+
+			cpInternal->eStatus = NotReady;
+
+			//Destroy PRNG & HE
+			if (cpInternal->cpHuffmanGearbox!=NULL)
+			{
+				delete cpInternal->cpHuffmanGearbox;
+			}
+			if (cpInternal->RabbitPRNGState!=NULL)
+			{
+				delete cpInternal->RabbitPRNGState;
+			}
+		}
+	}
+	
+
 	twoBitKeystreamStack::~twoBitKeystreamStack()
 	{
-		delete keyStream;
+		delete[] keyStream;
 	}
 
 	twoBitKeystreamStack::twoBitKeystreamStack( ECRYPT_ctx* iRabbitPRNGState )
 	{
 		RabbitPRNGState = iRabbitPRNGState;
 		keyStream = new u8[KEYSTREAMBUFFERSIZE];
+		twoBitChunks = gcnew List<uint8>();
 	}
 
 	uint8 twoBitKeystreamStack::pop()
 	{
 		uint8 temp;
 
-		if ( twoBitChunks.size() == 0 )
+		if ( twoBitChunks->Count == 0 )
 		{			
 			ECRYPT_keystream_bytes(RabbitPRNGState, keyStream, KEYSTREAMBUFFERSIZE);
 #if KEYSTREAMBUFFERSIZE > 1
 			for ( uint16 index = KEYSTREAMBUFFERSIZE-1; index > 0; index-- )
 			{
-				twoBitChunks.push_back( (keyStream[index]>>6) & 0x3 );
-				twoBitChunks.push_back( (keyStream[index]>>4) & 0x3 );
-				twoBitChunks.push_back( (keyStream[index]>>2) & 0x3 );
-				twoBitChunks.push_back( keyStream[index] & 0x3 );
+				twoBitChunks->Add( (keyStream[index]>>6) & 0x3 );
+				twoBitChunks->Add( (keyStream[index]>>4) & 0x3 );
+				twoBitChunks->Add( (keyStream[index]>>2) & 0x3 );
+				twoBitChunks->Add( keyStream[index] & 0x3 );
+				keyStream[index] = 0;
 			}
 #endif
-			twoBitChunks.push_back( (keyStream[0]>>6) & 0x3 );
-			twoBitChunks.push_back( (keyStream[0]>>4) & 0x3 );
-			twoBitChunks.push_back( (keyStream[0]>>2) & 0x3 );
+			twoBitChunks->Add( (keyStream[0]>>6) & 0x3 );
+			twoBitChunks->Add( (keyStream[0]>>4) & 0x3 );
+			twoBitChunks->Add( (keyStream[0]>>2) & 0x3 );
 			temp = keyStream[0] & 0x3;
 			keyStream[0] = 0;
 		}
 		else
 		{
-			temp = twoBitChunks.back();
-			twoBitChunks.pop_back();
-		}
-
-		return temp;
-	}
-
-	oneBitKeystreamStack::~oneBitKeystreamStack()
-	{
-		delete keyStream;
-	}
-
-	oneBitKeystreamStack::oneBitKeystreamStack( ECRYPT_ctx* iRabbitPRNGState )
-	{
-		RabbitPRNGState = iRabbitPRNGState;
-		keyStream = new u8[KEYSTREAMBUFFERSIZE];
-	}
-
-	uint1 oneBitKeystreamStack::pop()
-	{
-		uint1 temp;
-
-		if ( oneBitChunks.size() == 0 )
-		{			
-			ECRYPT_keystream_bytes(RabbitPRNGState, keyStream, KEYSTREAMBUFFERSIZE);
-#if KEYSTREAMBUFFERSIZE > 1
-			for ( uint16 index = KEYSTREAMBUFFERSIZE-1; index > 0; index-- )
-			{
-				oneBitChunks.push_back( (keyStream[index]>>7) & 0x1 );
-				oneBitChunks.push_back( (keyStream[index]>>6) & 0x1 );
-				oneBitChunks.push_back( (keyStream[index]>>5) & 0x1 );
-				oneBitChunks.push_back( (keyStream[index]>>4) & 0x1 );
-				oneBitChunks.push_back( (keyStream[index]>>3) & 0x1 );
-				oneBitChunks.push_back( (keyStream[index]>>2) & 0x1 );
-				oneBitChunks.push_back( (keyStream[index]>>1) & 0x1 );
-				oneBitChunks.push_back( keyStream[index] & 0x1 );
-			}
-#endif
-			oneBitChunks.push_back( (keyStream[0]>>7) & 0x1 );
-			oneBitChunks.push_back( (keyStream[0]>>6) & 0x1 );
-			oneBitChunks.push_back( (keyStream[0]>>5) & 0x1 );
-			oneBitChunks.push_back( (keyStream[0]>>4) & 0x1 );
-			oneBitChunks.push_back( (keyStream[0]>>3) & 0x1 );
-			oneBitChunks.push_back( (keyStream[0]>>2) & 0x1 );
-			oneBitChunks.push_back( (keyStream[0]>>1) & 0x1 );
-			temp = keyStream[0] & 0x1;
-			keyStream[0] = 0;
-		}
-		else
-		{
-			temp = oneBitChunks.back();
-			oneBitChunks.pop_back();
+			temp = twoBitChunks[twoBitChunks->Count - 1];
+			twoBitChunks->RemoveAt(twoBitChunks->Count - 1);
 		}
 
 		return temp;
@@ -146,30 +894,40 @@ namespace cipup {
 	oneBitIstreamStack::~oneBitIstreamStack()
 	{	}
 
-	oneBitIstreamStack::oneBitIstreamStack( istream& input ) : source(input)
-	{	}
+	oneBitIstreamStack::oneBitIstreamStack( istream& input )
+	{	
+		source = gcnew istreamManagedWrapper(&input);
+		oneBitChunks = gcnew List<uint1>();
+	}
 
 	uint1 oneBitIstreamStack::pop()
 	{
 		uint1 retval;
 
-		if ( oneBitChunks.size() == 0 )
+		if ( oneBitChunks->Count == 0 )
 		{
 			uint8 temp;
-			source >> temp;
-			oneBitChunks.push_back( (temp>>7) & 0x1 );
-			oneBitChunks.push_back( (temp>>6) & 0x1 );
-			oneBitChunks.push_back( (temp>>5) & 0x1 );
-			oneBitChunks.push_back( (temp>>4) & 0x1 );
-			oneBitChunks.push_back( (temp>>3) & 0x1 );
-			oneBitChunks.push_back( (temp>>2) & 0x1 );
-			oneBitChunks.push_back( (temp>>1) & 0x1 );
+			if ( ((istreamManagedWrapper^)source)->good() )
+			{
+				*((istreamManagedWrapper^)source) >> temp;
+			}
+			else
+			{
+				throw exception("Unexpected end of stream!");
+			}
+			oneBitChunks->Add( (temp>>7) & 0x1 );
+			oneBitChunks->Add( (temp>>6) & 0x1 );
+			oneBitChunks->Add( (temp>>5) & 0x1 );
+			oneBitChunks->Add( (temp>>4) & 0x1 );
+			oneBitChunks->Add( (temp>>3) & 0x1 );
+			oneBitChunks->Add( (temp>>2) & 0x1 );
+			oneBitChunks->Add( (temp>>1) & 0x1 );
 			retval = temp & 0x1;
 		}
 		else
 		{
-			retval = oneBitChunks.back();
-			oneBitChunks.pop_back();
+			retval = oneBitChunks[oneBitChunks->Count - 1];
+			oneBitChunks->RemoveAt(oneBitChunks->Count - 1);
 		}
 
 		return retval;
@@ -177,9 +935,105 @@ namespace cipup {
 
 	bool oneBitIstreamStack::buffered()
 	{
-		return ( oneBitChunks.size() > 0 );
+		return ( oneBitChunks->Count > 0 );
 	}
 	
+#ifdef RANDOM_LOTTERY
+
+	oneBitKeystreamStack::~oneBitKeystreamStack()
+	{
+		delete[] keyStream;
+	}
+
+	oneBitKeystreamStack::oneBitKeystreamStack( ECRYPT_ctx* iRabbitPRNGState )
+	{
+		RabbitPRNGState = iRabbitPRNGState;
+		keyStream = new u8[KEYSTREAMBUFFERSIZE];
+		oneBitChunks = gcnew List<uint1>();
+	}
+
+	uint1 oneBitKeystreamStack::pop()
+	{
+		uint1 temp;
+
+		if ( oneBitChunks->Count == 0 )
+		{			
+			ECRYPT_keystream_bytes(RabbitPRNGState, keyStream, KEYSTREAMBUFFERSIZE);
+#if KEYSTREAMBUFFERSIZE > 1
+			for ( uint16 index = KEYSTREAMBUFFERSIZE-1; index > 0; index-- )
+			{
+				oneBitChunks->Add( (keyStream[index]>>7) & 0x1 );
+				oneBitChunks->Add( (keyStream[index]>>6) & 0x1 );
+				oneBitChunks->Add( (keyStream[index]>>5) & 0x1 );
+				oneBitChunks->Add( (keyStream[index]>>4) & 0x1 );
+				oneBitChunks->Add( (keyStream[index]>>3) & 0x1 );
+				oneBitChunks->Add( (keyStream[index]>>2) & 0x1 );
+				oneBitChunks->Add( (keyStream[index]>>1) & 0x1 );
+				oneBitChunks->Add( keyStream[index] & 0x1 );
+				keyStream[index] = 0;
+			}
+#endif
+			oneBitChunks->Add( (keyStream[0]>>7) & 0x1 );
+			oneBitChunks->Add( (keyStream[0]>>6) & 0x1 );
+			oneBitChunks->Add( (keyStream[0]>>5) & 0x1 );
+			oneBitChunks->Add( (keyStream[0]>>4) & 0x1 );
+			oneBitChunks->Add( (keyStream[0]>>3) & 0x1 );
+			oneBitChunks->Add( (keyStream[0]>>2) & 0x1 );
+			oneBitChunks->Add( (keyStream[0]>>1) & 0x1 );
+			temp = keyStream[0] & 0x1;
+			keyStream[0] = 0;
+		}
+		else
+		{
+			temp = oneBitChunks[oneBitChunks->Count - 1];
+			oneBitChunks->RemoveAt(oneBitChunks->Count - 1);
+		}
+
+		return temp;
+	}
+
+#else
+
+	oneByteKeystreamStack::~oneByteKeystreamStack()
+	{
+		delete[] keyStream;
+	}
+
+	oneByteKeystreamStack::oneByteKeystreamStack( ECRYPT_ctx* iRabbitPRNGState )
+	{
+		RabbitPRNGState = iRabbitPRNGState;
+		keyStream = new u8[KEYSTREAMBUFFERSIZE];
+		byteChunks = gcnew List<uint8>();
+	}
+
+	uint8 oneByteKeystreamStack::pop()
+	{
+		uint8 temp;
+
+		if ( byteChunks->Count == 0 )
+		{			
+			ECRYPT_keystream_bytes(RabbitPRNGState, keyStream, KEYSTREAMBUFFERSIZE);
+#if KEYSTREAMBUFFERSIZE > 1
+			for ( uint16 index = KEYSTREAMBUFFERSIZE-1; index > 0; index-- )
+			{
+				byteChunks->Add( keyStream[index] );
+				keyStream[index] = 0;
+			}
+#endif
+			temp = keyStream[0];
+			keyStream[0] = 0;
+		}
+		else
+		{
+			temp = byteChunks[byteChunks->Count - 1];
+			byteChunks->RemoveAt(byteChunks->Count - 1);
+		}
+
+		return temp;
+	}
+
+#endif
+
 	randomLottery::~randomLottery()
 	{
 		delete decisionSource;
@@ -187,17 +1041,26 @@ namespace cipup {
 
 	randomLottery::randomLottery( uint16 count, ECRYPT_ctx* iRabbitPRNGState )
 	{
-		decisionSource = new oneBitKeystreamStack(iRabbitPRNGState);
+
+#ifdef RANDOM_LOTTERY
+		decisionSource = gcnew oneBitKeystreamStack(iRabbitPRNGState);
+#else
+		decisionSource = gcnew oneByteKeystreamStack(iRabbitPRNGState);
+#endif
+		lotteryBalls = gcnew List<uint16>();
 
 		for ( uint16 itr = 0; itr < count; itr++ )
 		{
-			lotteryBalls.push_back(itr);
+			lotteryBalls->Add(itr);
 		}
 	}
 
 	uint16 randomLottery::pop()
 	{
-		uint16 curMinIndex = 0, curMaxIndex = lotteryBalls.size()-1, diff, selection;
+
+#ifdef RANDOM_LOTTERY
+
+		uint16 curMinIndex = 0, curMaxIndex = lotteryBalls->Count-1, diff, selection;
 		uint1 decision;
 
 		for ( diff = curMaxIndex-curMinIndex; diff > 0;  diff = curMaxIndex-curMinIndex )
@@ -248,9 +1111,21 @@ namespace cipup {
 		}
 		
 		selection = lotteryBalls[curMinIndex];
-		lotteryBalls.erase(lotteryBalls.begin()+curMinIndex);
+		lotteryBalls->RemoveAt(curMinIndex);
 		return selection;
+
+#else
+		uint16 curMinIndex = 0, curMaxIndex = lotteryBalls->Count, selection;
+
+		curMinIndex = (uint16) ( ( ( (double)(decisionSource->pop()) / ( (double)UCHAR_MAX + 1.0) ) *  (double)curMaxIndex ) / 1 ); // + curMinIndex;
+
+		selection = lotteryBalls[curMinIndex];
+		lotteryBalls->RemoveAt(curMinIndex);
+		return selection;
+#endif
+
 	}
+
 
 	namespace {
 		void deleteTree( treenode* cpTreeCrown ) {
@@ -269,7 +1144,7 @@ namespace cipup {
 			}
 		}
 
-		void buildDownTree( treebranch* cpCurrentBranch, uint16& LeafsRemaining, twoBitKeystreamStack* cpTwoBitChunks )
+		void buildDownTree( treebranch* cpCurrentBranch, uint16& LeafsRemaining, twoBitKeystreamStack^ cpTwoBitChunks )
 		{
 			if ( LeafsRemaining > 1 )
 			{
@@ -391,7 +1266,7 @@ namespace cipup {
 			}
 		}
 
-		void buildUpTree( treebranch* cpTreeRoot, uint16& LeafsRemaining, twoBitKeystreamStack* cpTwoBitChunks )
+		void buildUpTree( treebranch* cpTreeRoot, uint16& LeafsRemaining, twoBitKeystreamStack^ cpTwoBitChunks )
 		{
 
 			if ( LeafsRemaining > 1 )
@@ -533,12 +1408,12 @@ namespace cipup {
 #ifdef FASTER_HUFFMAN // Faster crank	
 			for ( int ctr=0, ctrmax=2*FULL_SET_SIZE; ctr < ctrmax; ctr++ )
 			{
-				delete aaui8ReverseTable[ctr];
+				delete[] aaui8ReverseTable[ctr];
 			}
-			delete aaui8ReverseTable;
+			delete[] aaui8ReverseTable;
 #else // More secure
-			delete aui8ForwardSet;
-			delete aui8ReverseSet;
+			delete[] aui8ForwardSet;
+			delete[] aui8ReverseSet;
 #endif
 		}
 		else //InitWrite, encoding
@@ -550,15 +1425,15 @@ namespace cipup {
 				{
 					delete aacpGearTable[ctr][index];
 				}
-				delete aacpGearTable[ctr];
+				delete[] aacpGearTable[ctr];
 			}
-			delete aacpGearTable;
+			delete[] aacpGearTable;
 #else // More secure
 			for ( int index=0; index < FULL_SET_SIZE; index++ )
 			{
 				delete acpGears[index];
 			}
-			delete acpGears;
+			delete[] acpGears;
 #endif
 		}
 
@@ -577,7 +1452,7 @@ namespace cipup {
 		cpTreeStart->one = new treeleaf();  
 		cpTreeStart->one->IsLeaf = true;
 
-		twoBitKeystreamStack* cpTwoBitChunks = new twoBitKeystreamStack(RabbitPRNGState);
+		twoBitKeystreamStack^ cpTwoBitChunks = gcnew twoBitKeystreamStack(RabbitPRNGState);
 		uint16 temp = FULL_SET_SIZE-2;
 		buildUpTree(cpTreeStart, temp, cpTwoBitChunks);
 		delete cpTwoBitChunks;
@@ -585,7 +1460,7 @@ namespace cipup {
 		cpTreeCrown = cpTreeStart;
 		
 		ui1AlphaBetaSpin = 0;
-		randomLottery IndexSelector ( FULL_SET_SIZE, RabbitPRNGState );
+		randomLottery^ IndexSelector = gcnew randomLottery( FULL_SET_SIZE, RabbitPRNGState );
 
 		if ( eInitType == InitRead ) //decoding
 		{
@@ -604,7 +1479,7 @@ namespace cipup {
 
 			for ( int index=0; index < FULL_SET_SIZE; index++ )
 			{
-				aui8ForwardSet[IndexSelector.pop()] = index;
+				aui8ForwardSet[IndexSelector->pop()] = index;
 			}
 
 			for ( int index=0; index < FULL_SET_SIZE; index++ )
@@ -615,7 +1490,7 @@ namespace cipup {
 			//Generate remaining rows
 			crankCascade();
 
-			delete aui8ForwardSet; //No longer needed
+			delete[] aui8ForwardSet; //No longer needed
 			
 #else // More secure
 
@@ -623,7 +1498,7 @@ namespace cipup {
 
 			for ( int index=0; index < FULL_SET_SIZE; index++ )
 			{
-				aui8ForwardSet[IndexSelector.pop()] = index;
+				aui8ForwardSet[IndexSelector->pop()] = index;
 			}
 
 			aui8ReverseSet = new uint8[FULL_SET_SIZE];
@@ -661,7 +1536,7 @@ namespace cipup {
 		}
 	}
 
-	void huffman_gearbox::encode( uint8 datum, Out<>* bsBitBufferIn, uint16& ui16BitsBuffered  )
+	void huffman_gearbox::encode( uint8 datum, Out<>* bsBitBufferIn, uint16% ui16BitsBuffered  )
 	{
 		huffman_gear* temp;
 #ifdef SHRINK_CYPHERTEXT
@@ -691,10 +1566,10 @@ namespace cipup {
 #endif
 	}
 
-	void huffman_gearbox::decode( istream& input, ostream* output, uint64& ui64BytesRead )
+	void huffman_gearbox::decode( istream& input, Stream^ output, bool outputWrapped, uint64% ui64BytesRead )
 	{
 		//consume entire stream until dummy found
-		oneBitIstreamStack TreeNavigator ( input );
+		oneBitIstreamStack^ TreeNavigator = gcnew oneBitIstreamStack( input );
 
 		treenode* treeCursor;
 
@@ -702,14 +1577,14 @@ namespace cipup {
 		uint8 temp;
 #endif
 
-		while ( input.good() || TreeNavigator.buffered() )
+		while ( input.good() || TreeNavigator->buffered() )
 		{
 			treeCursor = cpTreeCrown; //Rewind to top of tree
 
 			//Navigate down to a leaf, consuming bits
 			while ( treeCursor->IsLeaf == false )
 			{
-				if ( TreeNavigator.pop() == 0 )
+				if ( TreeNavigator->pop() == 0 )
 				{
 					treeCursor = ((treebranch*)treeCursor)->zero;
 				}
@@ -725,7 +1600,14 @@ namespace cipup {
 #ifdef SHRINK_CYPHERTEXT
 				temp = aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum];
 #else
-				*output << aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum];
+				if (outputWrapped)
+				{
+					((ostreamManagedWrapper^)(cpInternal->output)) << aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum];
+				}
+				else
+				{
+					output->WriteByte(aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum]);
+				}
 #endif
 			}
 #else // More secure
@@ -734,7 +1616,14 @@ namespace cipup {
 #ifdef SHRINK_CYPHERTEXT
 				temp = aui8ReverseSet[((treeleaf*)treeCursor)->datum];
 #else
-				*output << aui8ReverseSet[((treeleaf*)treeCursor)->datum];
+				if (outputWrapped)
+				{
+					((ostreamManagedWrapper^)(output)) << aui8ReverseSet[((treeleaf*)treeCursor)->datum];
+				}
+				else
+				{
+					output->WriteByte(aui8ReverseSet[((treeleaf*)treeCursor)->datum]);
+				}
 #endif
 				
 			}
@@ -755,7 +1644,7 @@ namespace cipup {
 			//Navigate down to a leaf, consuming bits
 			while ( treeCursor->IsLeaf == false )
 			{
-				if ( TreeNavigator.pop() == 0 )
+				if ( TreeNavigator->pop() == 0 )
 				{
 					treeCursor = ((treebranch*)treeCursor)->zero;
 				}
@@ -768,12 +1657,26 @@ namespace cipup {
 #ifdef FASTER_HUFFMAN // Faster crank
 			if ( aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum] < CHAR_SET_SIZE )
 			{
-				*output << ( ((aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum])<<4) | temp );
+				if (outputWrapped)
+				{
+					((ostreamManagedWrapper^)(cpInternal->output)) << ( ((aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum])<<4) | temp );
+				}
+				else
+				{
+					output->WriteByte( ((aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum])<<4) | temp );
+				}
 			}
 #else // More secure
 			if ( aui8ReverseSet[((treeleaf*)treeCursor)->datum] < CHAR_SET_SIZE )
 			{
-				*output << ( ((aui8ReverseSet[((treeleaf*)treeCursor)->datum])<<4) | temp );			
+				if (outputWrapped)
+				{
+					((ostreamManagedWrapper^)(cpInternal->output)) << ( ((aui8ReverseSet[((treeleaf*)treeCursor)->datum])<<4) | temp );
+				}
+				else
+				{
+					output->WriteByte( ((aui8ReverseSet[((treeleaf*)treeCursor)->datum])<<4) | temp );
+				}
 			}
 #endif
 			else
@@ -788,13 +1691,13 @@ namespace cipup {
 		}
 	}
 
-	void huffman_gearbox::generateGears( treenode* cpCurrentNode, randomLottery& IndexSelector, uint8 Depth, std::vector< uint8 >& Sequence, huffman_gear** acpGearBox )
+	void huffman_gearbox::generateGears( treenode* cpCurrentNode, randomLottery^ IndexSelector, uint8 Depth, std::vector< uint8 >& Sequence, huffman_gear** acpGearBox )
 	{
 		if (cpCurrentNode != NULL )
 		{
 			if (cpCurrentNode->IsLeaf)
 			{
-				acpGearBox[IndexSelector.pop()] = new huffman_gear( Sequence, Depth );
+				acpGearBox[IndexSelector->pop()] = new huffman_gear( Sequence, Depth );
 			}
 			else
 			{
@@ -980,27 +1883,17 @@ namespace cipup {
 		eStatus = NotReady;
 		eInitType = NotInit;
 		eDestType = DestNone;
-		bsBitBufferIn = new Out<>(ssBitBufferOut);
+		stringstream* temp = new stringstream();
+		ssBitBufferOut = gcnew stringstreamManagedWrapper(temp);
+		bsBitBufferIn = new Out<>(*temp);
 		ui64BitsWritten = 0;
 		ui64BytesRead = 0;
+		outputWrapped = false;
 	}
 	engine_internal::~engine_internal()
 	{
 		delete bsBitBufferIn;
-		
-		//These should not be needed
-		if (cpHuffmanGearbox!=NULL)
-		{
-			delete cpHuffmanGearbox;
-		}
-		if (RabbitPRNGState!=NULL)
-		{
-			delete RabbitPRNGState;
-		}
-		if (output!=NULL)
-		{
-			delete output;
-		}
+		ssBitBufferOut->delSSPtr();
 	}
 
 	void engine_internal::flush()
@@ -1015,400 +1908,50 @@ namespace cipup {
 		uint8 middletext[ECRYPT_BLOCKLENGTH]; //middletext input buffer for PRNG
 		uint8 cryptext[ECRYPT_BLOCKLENGTH]; //cryptext output buffer for PRNG
 		//output is cryptext
+		array<uint8>^ outputBuf = gcnew array<uint8>(ECRYPT_BLOCKLENGTH);
+		int itr;
 
 		//Consume full blocks from bit buffer, XORing and feeding to output
 		while ( ui16BitsBuffered >= ECRYPT_BLOCKLENGTH*8 )
 		{				
-			ssBitBufferOut.read((char *)middletext, ECRYPT_BLOCKLENGTH); //Pull a block into buffer
+			ssBitBufferOut->read(middletext, ECRYPT_BLOCKLENGTH); //Pull a block into buffer
 			ECRYPT_encrypt_blocks(RabbitPRNGState, middletext, cryptext, 1); //XOR
 			ui64BitsWritten += ECRYPT_BLOCKLENGTH*8;
 			ui16BitsBuffered -= ECRYPT_BLOCKLENGTH*8; //Mark bit buffer reduction
-			output->write((char *)cryptext, ECRYPT_BLOCKLENGTH); //Dump into output
+
+			if ( outputWrapped )
+			{
+				((ostreamManagedWrapper^)(output))->write(cryptext, ECRYPT_BLOCKLENGTH); //Dump into output
+			}
+			else
+			{
+				for (itr=0; itr<ECRYPT_BLOCKLENGTH; itr--)
+				{
+					outputBuf[itr] = cryptext[itr];
+				}
+				output->Write(outputBuf,0,ECRYPT_BLOCKLENGTH);
+			}
 		}
 		
 		if ( ui16BitsBuffered > 0 )
 		{
 			//Remaining bytes
 			uint8 RemainingBytes = (ui16BitsBuffered % 8 > 0 ) ? ((ui16BitsBuffered/8)+1) : (ui16BitsBuffered/8);
-			ssBitBufferOut.read((char *)middletext, RemainingBytes ); //Pull a block into buffer
+			ssBitBufferOut->read(middletext, RemainingBytes ); //Pull a block into buffer
 			ECRYPT_encrypt_bytes(RabbitPRNGState, middletext, cryptext, RemainingBytes); //XOR
 			ui64BitsWritten += ui16BitsBuffered;
-			ui16BitsBuffered = 0; //Mark bit buffer reduction				
-			output->write((char *)cryptext, RemainingBytes ); //Dump into output
-		}
-	}
-
-	// This is the constructor of a class that has been exported.
-	// see cipup.h for the class definition
-	engine::engine()
-	{
-		cpInternal = new engine_internal();
-
-		return;
-	}
-
-	engine::~engine()
-	{
-		finalize();
-
-		delete cpInternal;
-		return;
-	}
-
-	bool engine::canread()
-	{
-		return ( ( cpInternal->eStatus == Ready ) && ( cpInternal->eInitType == InitRead ) );
-	}
-	bool engine::canwrite()
-	{
-		return ( ( cpInternal->eStatus != NotReady ) && ( cpInternal->eInitType == InitWrite ) );
-	}
-	bool engine::ready()
-	{
-		return ( ( cpInternal->eStatus != NotReady ) && ( cpInternal->eInitType != NotInit ) );
-	}
-
-	uint64 engine::bytesread()
-	{
-		return cpInternal->ui64BytesRead;
-	}
-
-	uint64 engine::bitswritten()
-	{
-		return cpInternal->ui64BitsWritten;
-	}
-	uint64 engine::byteswritten()
-	{
-		return (cpInternal->ui64BitsWritten)/8;
-	}
-	uint8 engine::overflowbits()
-	{
-		return (uint8)((cpInternal->ui64BitsWritten)%8);
-	}
-
-	MessageCode engine::init( InitAction action, ostringstream* output, uint8* key, uint8 keybytelen, uint8* iv, uint8 ivbytelen )
-	{
-		if ( cpInternal->eStatus == NotReady )
-		{
-			if ( keybytelen != KEYSIZEINBYTES )
+			ui16BitsBuffered = 0; //Mark bit buffer reduction
+			if ( outputWrapped )
 			{
-				return InitFailureInvalidKeyLength;
-			}
-			if ( ivbytelen != IVSIZEINBYTES )
-			{
-				return InitFailureInvalidIVLength;
-			}
-
-			if ( action == InitDecrypt )
-			{
-				//Build PRNG
-				cpInternal->RabbitPRNGState = new ECRYPT_ctx;
-				ECRYPT_init();
-				ECRYPT_keysetup(cpInternal->RabbitPRNGState, key, keybytelen*8, ivbytelen*8); //bit size of key and iv
-				ECRYPT_ivsetup(cpInternal->RabbitPRNGState, iv);
-
-				//Build HuffmanEngine
-				cpInternal->cpHuffmanGearbox = new huffman_gearbox( InitRead, cpInternal->RabbitPRNGState );
-
-				cpInternal->eInitType = InitRead;
-			}
-			else if ( action == InitEncrypt )
-			{
-				//Build PRNG
-				cpInternal->RabbitPRNGState = new ECRYPT_ctx;
-				ECRYPT_init();
-				ECRYPT_keysetup(cpInternal->RabbitPRNGState, key, keybytelen*8, ivbytelen*8); //bit size of key and iv
-				ECRYPT_ivsetup(cpInternal->RabbitPRNGState, iv);
-
-				//Build HuffmanEngine
-				cpInternal->cpHuffmanGearbox = new huffman_gearbox( InitWrite, cpInternal->RabbitPRNGState );
-
-				//Clear bitstream
-				cpInternal->bsBitBufferIn->flush();
-				cpInternal->ssBitBufferOut.str( string() );
-				cpInternal->ssBitBufferOut.clear();
-
-				//Prepare output stream for cyphertext
-				output->str( string() );
-				output->clear();
-
-				cpInternal->eInitType = InitWrite;
+				((ostreamManagedWrapper^)(output))->write(cryptext, RemainingBytes); //Dump into output
 			}
 			else
 			{
-				return InitFailureInvalidAction;
-			}
-
-			cpInternal->eDestType = DestStream;
-			cpInternal->output = output;
-
-			cpInternal->ui64BitsWritten = 0;
-			cpInternal->ui64BytesRead = 0;
-
-		}
-		else
-		{
-			return InitFailureNeedFinalize;
-		}
-
-		//Set status
-		cpInternal->eStatus = Ready;
-
-		return InitSuccess;		
-	}
-
-	MessageCode engine::init( InitAction action, const char* filename, bool append, uint8* key, uint8 keybytelen, uint8* iv, uint8 ivbytelen )
-	{
-		if ( cpInternal->eStatus == NotReady )
-		{
-			if ( keybytelen != KEYSIZEINBYTES )
-			{
-				return InitFailureInvalidKeyLength;
-			}
-			if ( ivbytelen != IVSIZEINBYTES )
-			{
-				return InitFailureInvalidIVLength;
-			}
-
-			if ( action == InitDecrypt )
-			{
-				cpInternal->output = new ofstream();
-				if ( append )
+				for (itr=0; itr<RemainingBytes; itr--)
 				{
-					((ofstream*)(cpInternal->output))->open(filename, ios::out | ios::app);
+					outputBuf[itr] = cryptext[itr];
 				}
-				else
-				{
-					((ofstream*)(cpInternal->output))->open(filename);
-				}
-
-				if ( cpInternal->output->fail() )
-				{
-					return InitFailureFileError;
-				}
-
-				//Build PRNG
-				cpInternal->RabbitPRNGState = new ECRYPT_ctx;
-				ECRYPT_init();
-				ECRYPT_keysetup(cpInternal->RabbitPRNGState, key, keybytelen*8, ivbytelen*8); //bit size of key and iv
-				ECRYPT_ivsetup(cpInternal->RabbitPRNGState, iv);
-
-				//Build HuffmanEngine
-				cpInternal->cpHuffmanGearbox = new huffman_gearbox( InitRead, cpInternal->RabbitPRNGState );
-
-				cpInternal->eInitType = InitRead;
-			}
-			else if ( action == InitEncrypt )
-			{
-
-				cpInternal->output = new ofstream();
-				((ofstream*)(cpInternal->output))->open(filename);
-				
-				if ( cpInternal->output->fail() )
-				{
-					return InitFailureFileError;
-				}
-
-				//Build PRNG
-				cpInternal->RabbitPRNGState = new ECRYPT_ctx;
-				ECRYPT_init();
-				ECRYPT_keysetup(cpInternal->RabbitPRNGState, key, keybytelen*8, ivbytelen*8); //bit size of key and iv
-				ECRYPT_ivsetup(cpInternal->RabbitPRNGState, iv);
-
-				//Build HuffmanEngine
-				cpInternal->cpHuffmanGearbox = new huffman_gearbox( InitWrite, cpInternal->RabbitPRNGState );
-
-				//Clear bitstream
-				cpInternal->bsBitBufferIn->flush();
-				cpInternal->ssBitBufferOut.str( string() );
-				cpInternal->ssBitBufferOut.clear();
-
-				cpInternal->eInitType = InitWrite;
-			}
-			else
-			{
-				return InitFailureInvalidAction;
-			}
-
-			cpInternal->eDestType = DestFile;
-
-			cpInternal->ui64BitsWritten = 0;
-			cpInternal->ui64BytesRead = 0;
-
-		}
-		else
-		{
-			return InitFailureNeedFinalize;
-		}
-
-		//Set status
-		cpInternal->eStatus = Ready;
-
-		return InitSuccess;		
-	}
-	
-	void engine::decrypt( istream& input )
-	{
-		if ( cpInternal->eInitType == InitRead )
-		{
-			if ( cpInternal->eStatus == Ready )
-			{
-				//input is cryptext
-				uint8 cryptext[ECRYPT_BLOCKLENGTH]; //cryptext input buffer for PRNG
-				uint8 middletext[ECRYPT_BLOCKLENGTH]; //middletext output buffer for PRNG
-				stringstream MiddleTextBuf; //middletext input buffer for huffman gearbox
-				//output is plaintext
-				
-				//XOR entire stream
-				while ( !input.eof() )
-				{
-					input.read((char *)cryptext, ECRYPT_BLOCKLENGTH); //Try to pull a block into buffer
-
-					if ( input.gcount() == ECRYPT_BLOCKLENGTH )
-					{
-						//Full block
-						ECRYPT_decrypt_blocks(cpInternal->RabbitPRNGState, cryptext, middletext, 1); //XOR
-						MiddleTextBuf.write((char *)middletext, ECRYPT_BLOCKLENGTH); //Dump into buffer
-					}
-					else
-					{
-						//Remaining bytes
-						ECRYPT_decrypt_bytes(cpInternal->RabbitPRNGState, cryptext, middletext, input.gcount() ); //XOR
-						MiddleTextBuf.write((char *)middletext, input.gcount() ); //Dump into buffer, finishing message
-						break;
-					}
-
-				}
-								
-				//Feed middletext into huffman gearbox
-				cpInternal->cpHuffmanGearbox->decode( MiddleTextBuf, cpInternal->output, cpInternal->ui64BytesRead ); //Plaintext is feed directly into output stream
-			}
-		}
-	}
-	void engine::operator>> ( istream& input )
-	{
-		decrypt(input);
-	}	
-
-
-	void engine::encrypt( const uint8& datum )
-	{
-		if ( cpInternal->eInitType == InitWrite )
-		{
-			if ( cpInternal->eStatus == SemiReady )
-			{
-				//Clear output stream
-				((ostringstream*)(cpInternal->output))->str( string() );
-				cpInternal->output->clear();
-				//Reset size
-				cpInternal->ui64BitsWritten = 0;
-				//Set status
-				cpInternal->eStatus = Ready;
-			}
-
-			if ( cpInternal->eStatus == Ready )
-			{
-				//Encode datum byte in huffman gearbox into bit buffer
-				cpInternal->cpHuffmanGearbox->encode( datum, cpInternal->bsBitBufferIn, cpInternal->ui16BitsBuffered );
-				
-				//Consume full blocks from bit buffer if available, XORing and feeding to output
-				if ( cpInternal->ui16BitsBuffered >= ECRYPT_BLOCKLENGTH*8 )
-				{
-					//ssBitBufferOut is middletext
-					uint8 middletext[ECRYPT_BLOCKLENGTH]; //middletext input buffer for PRNG
-					uint8 cryptext[ECRYPT_BLOCKLENGTH]; //cryptext output buffer for PRNG
-					//output is cryptext
-
-					do
-					{
-						cpInternal->ssBitBufferOut.read((char *)middletext, ECRYPT_BLOCKLENGTH); //Pull a block into buffer
-						ECRYPT_encrypt_blocks(cpInternal->RabbitPRNGState, middletext, cryptext, 1); //XOR
-						cpInternal->ui64BitsWritten += ECRYPT_BLOCKLENGTH*8;
-						cpInternal->ui16BitsBuffered -= ECRYPT_BLOCKLENGTH*8; //Mark bit buffer reduction
-						cpInternal->output->write((char *)cryptext, ECRYPT_BLOCKLENGTH); //Dump into output
-
-					} while ( cpInternal->ui16BitsBuffered >= ECRYPT_BLOCKLENGTH*8 );
-				}
-			}
-		}
-
-	}
-	void engine::operator<< ( const uint8& datum )
-	{
-		encrypt(datum);
-	}	
-
-	void engine::encrypt( const std::vector< uint8 >& data )
-	{
-		for (uint32 i=0; i<data.size(); i++)
-			encrypt(data.at(i));
-	}
-	void engine::operator<< ( const std::vector< uint8 >& data )
-	{
-		encrypt(data);
-	}	
-
-	void engine::flush()
-	{
-		if ( cpInternal->eInitType == InitWrite )
-		{
-			if ( cpInternal->eDestType == DestStream )
-			{
-				if ( cpInternal->eStatus == Ready )
-				{
-					//Dump bit buffer into output
-					cpInternal->flush(); // Internal flush
-
-					//Reset bit buffer
-					cpInternal->ssBitBufferOut.str( string() );
-					cpInternal->ssBitBufferOut.clear();
-
-					//Set status
-					cpInternal->eStatus = SemiReady;
-				}
-			}
-		}
-
-	}
-
-	void engine::finalize()
-	{
-		if ( cpInternal->eStatus != NotReady )
-		{
-			if ( cpInternal->eInitType == InitRead )
-			{
-				if ( cpInternal->eDestType == DestFile )
-				{
-					((ofstream*)(cpInternal->output))->close();
-					delete ((ofstream*)(cpInternal->output));
-				}
-			}
-			else if ( cpInternal->eInitType == InitWrite )
-			{
-				if ( cpInternal->eStatus == Ready )
-				{
-					cpInternal->flush(); //Internal flush
-				}
-
-				if ( cpInternal->eDestType == DestFile )
-				{
-					((ofstream*)(cpInternal->output))->close();
-					delete ((ofstream*)(cpInternal->output));
-				}
-				//else if ( cpInternal->eDestType == DestStream ) { }
-
-			}
-
-			cpInternal->eStatus = NotReady;
-
-			//Destroy PRNG & HE
-			if (cpInternal->cpHuffmanGearbox!=NULL)
-			{
-				delete cpInternal->cpHuffmanGearbox;
-			}
-			if (cpInternal->RabbitPRNGState!=NULL)
-			{
-				delete cpInternal->RabbitPRNGState;
+				output->Write(outputBuf,0,RemainingBytes);
 			}
 		}
 	}

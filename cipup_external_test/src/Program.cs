@@ -15,9 +15,12 @@
 ================================================================*/
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using NUnit.Framework;
+
 
 namespace cipup_external_test
 {
@@ -26,10 +29,58 @@ namespace cipup_external_test
     {
 
         [Test]
+        public void GetVersionTextTest()
+        {
+            Console.WriteLine(cipup.engine.GetVersionText());
+        }
+
+        [Test]
+        public void PrintVersionTextTest()
+        {
+            cipup.engine.PrintVersionText();
+        }
+
+        [Test]
+        public void GetConfigurationTextTest()
+        {
+            Console.WriteLine(cipup.engine.GetConfiguration());
+        }
+
+        [Test]
+        public void PrintConfigurationTextTest()
+        {
+            cipup.engine.PrintConfiguration();
+        }
+
+        [Test]
+        public void RequiredKeyByteLengthTest()
+        {
+            Console.WriteLine(cipup.engine.RequiredKeyByteLength());
+        }
+
+        [Test]
+        public void RequiredIVByteLengthTest()
+        {
+            Console.WriteLine(cipup.engine.RequiredIVByteLength());
+        }
+
+        [Test]
+        public void GenerateKeyTest()
+        {
+            byte keylen = cipup.engine.RequiredKeyByteLength();
+            byte[] temp = null; // = new byte[keylen];
+            cipup.engine.GenerateKey(temp,keylen);
+         }
+
+        
+
+
+
+        [Test]
         public void InitializationTest()
         {
             cipup.engine beta = new cipup.engine();
-            
+
         }
     }
 } //namespace cipup_external_test

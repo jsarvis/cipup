@@ -134,6 +134,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
+				AdditionalDependencies="$(ProjectDir)..\cipup\Release\rabbit.obj"
 				LinkIncremental="1"
 				GenerateDebugInformation="true"
 				SubSystem="2"

@@ -24,6 +24,7 @@
 //#include <time.h>
 #include "stdafx.h"
 #include "cipup_internal_test.hpp"
+//#include "..\..\cipup\src\cipup.hpp"
 
 using namespace std;
 
@@ -45,7 +46,8 @@ namespace cipup_internal_test {
 
 	void test::PrintVersionTextTest()
 	{
-		cipup::PrintVersionText();
+		//cipup::PrintVersionText();
+		cipup::engine.PrintVersionText();
 	}
 
 } //namespace cipup_internal_test
