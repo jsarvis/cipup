@@ -456,6 +456,49 @@ namespace cipup_external_test
             Assert.AreEqual(cipup.MessageCode.InitFailureFileError, status);
         }
 
+        private static byte[] QuietStreamToStreamTest(cipup.InitAction action, byte[] key, byte keylen, byte[] iv, byte ivlen, byte[] srctext, int messagelen, Stream src, Stream dest)
+        {
+            long srcPos = src.Position;
+            src.Write(srctext, 0, messagelen);
+            src.Position = srcPos;
+
+            long destPos = dest.Position;
+
+            cipup.MessageCode status;
+
+            cipup.engine alpha = new cipup.engine();
+
+            status = alpha.init(action, dest, key, keylen, iv, ivlen);
+
+            Assert.AreEqual(cipup.MessageCode.InitSuccess, status);
+
+            ulong destlen;
+
+            if (action == cipup.InitAction.InitEncrypt)
+            {
+                alpha.encrypt(src);
+                alpha.flush();
+                alpha.finalize();
+                destlen = alpha.byteswritten() + (ulong)((alpha.overflowbits() > 0) ? 1 : 0);
+            }
+            else if (action == cipup.InitAction.InitDecrypt)
+            {
+                alpha.decrypt(src);
+                alpha.finalize();
+                destlen = alpha.bytesread();
+            }
+            else
+            {
+                throw new Exception("Invalid action!");
+            }
+
+            byte[] desttext = new byte[destlen];
+            dest.Position = destPos;
+            dest.Read(desttext, 0, (int)destlen);
+
+            return desttext;
+        }
+
         private static byte[] StreamToStreamTest(cipup.InitAction action, byte[] key, byte keylen, byte[] iv, byte ivlen, byte[] srctext, int messagelen, Stream src, Stream dest)
         {
             Console.WriteLine("Source text:");
@@ -599,6 +642,30 @@ namespace cipup_external_test
             StreamToStreamTest(cipup.InitAction.InitEncrypt, key, keylen, iv, ivlen, plaintext, messagelen, src, dest);
         }
 
+
+        private static ulong StatisticalStreamToStreamRandKeyRandIVRandMessageFullTest(Stream src, Stream dest)
+        {
+            byte keylen = cipup.engine.RequiredKeyByteLength();
+            byte ivlen = cipup.engine.RequiredIVByteLength();
+            int messagelen = TestMessageLen;
+            byte[] key = new byte[keylen];
+            byte[] iv = new byte[ivlen];
+            byte[] plaintext = new byte[messagelen];
+            cipup.engine.GenerateKey(key, keylen);
+            cipup.engine.GenerateKey(iv, ivlen);
+            cipup.engine.GenerateKey(plaintext, (uint)messagelen);
+
+            byte[] cryptext = QuietStreamToStreamTest(cipup.InitAction.InitEncrypt, key, keylen, iv, ivlen, plaintext, messagelen, src, dest);
+
+            src.SetLength(0);
+            dest.SetLength(0);
+
+            byte[] resulttext = QuietStreamToStreamTest(cipup.InitAction.InitDecrypt, key, keylen, iv, ivlen, cryptext, cryptext.Length, src, dest);
+            AssertEquals(plaintext, resulttext);
+
+            return (ulong)(cryptext.LongLength);
+        }
+
         private static void StreamToStreamRandKeyRandIVRandMessageFullTest(Stream src, Stream dest)
         {
             byte keylen = cipup.engine.RequiredKeyByteLength();
@@ -722,7 +789,6 @@ namespace cipup_external_test
 
             byte[] resulttext = StreamToStreamTest(cipup.InitAction.InitDecrypt, key, keylen, iv, ivlen, cryptext, cryptext.Length, src, dest);
             AssertEquals(plaintext, resulttext);
-
         }
 
         [Test]
@@ -1046,6 +1112,29 @@ namespace cipup_external_test
             dest.Close();
             File.Delete(dest.Name);
         }
+
+        //Statisical analysis
+
+        [Test]
+        public void StatisticalAverageExpansionTest()
+        {
+            MemoryStream src = new MemoryStream();
+            MemoryStream dest = new MemoryStream();
+
+            ulong numTests = 100;
+            ulong totalBytes = 0;
+
+            for (ulong i=0; i < numTests; i++ )
+            {
+                totalBytes += StatisticalStreamToStreamRandKeyRandIVRandMessageFullTest(src, dest);
+                src.SetLength(0);
+                dest.SetLength(0);
+            }
+
+            Console.WriteLine("Average expansion is {0}x the message length.", (decimal)( (decimal)((decimal)totalBytes / (decimal)numTests) / (decimal) TestMessageLen ) );
+
+        }
+
 
     }
 } //namespace cipup_external_test
