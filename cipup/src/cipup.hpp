@@ -21,9 +21,6 @@ limitations under the License.
 #include <string>
 #include <vector>
 
-using namespace System;
-using namespace std;
-
 namespace cipup {
 
 	/** <summary> Initialization return codes. Signifies success or reason for failure. Consult <c>engine.Messages</c> for a description of each code. </summary> */
@@ -55,9 +52,9 @@ namespace cipup {
 	</summary> */
 	public ref class engine {
 	public:
-
+		
 		/** <summary> Descriptions for the <c>MessageCode</c> returned by <c>init()</c>. Use the <c>MessageCode</c> as the index to this array. </summary> */
-		static array<String^>^ Messages = { "Init Successful", "Init Failure", "Init Failure: Invalid action", "Init Failure: Already initialized, call finalize", "Init Failure: File access error", 
+		static array<System::String^>^ Messages = { "Init Successful", "Init Failure", "Init Failure: Invalid action", "Init Failure: Already initialized, call finalize", "Init Failure: File access error", 
 			"Init Failure: Invalid Key length", "Init Failure: Invalid IV length" };
 
 		//CIPUP build information
@@ -69,7 +66,7 @@ namespace cipup {
 			</summary> 
 			<returns>A String containing the version text for this build of CIPIP.</returns>
 		*/
-		static String^ GetVersionText(void);
+		static System::String^ GetVersionText(void);
 		/**
 			<summary>
 			Prints the version text for CIPUP to the console.
@@ -86,7 +83,7 @@ namespace cipup {
 			</summary> 
 			<returns>A String containing the configuration text for this build of CIPIP.</returns>
 		*/
-		static String^ GetConfiguration(void);
+		static System::String^ GetConfiguration(void);
 		/**
 			<summary>
 			Prints the configuration text for CIPUP to the console.
@@ -122,7 +119,7 @@ namespace cipup {
 			<param name="key">Byte array to be filled with generated data.</param>
 			<param name="keybytelen">Length of the array in bytes. Recommended values can be found by calling <c>RequiredKeyByteLength()</c> and <c>RequiredIVByteLength()</c>.</param>
 		*/
-		static void GenerateKey(array<uint8>^ key, uint8 keybytelen); 
+		static void GenerateKey(array<uint8>^ key, uint32 keybytelen); 
 		/**
 			<summary>
 			Generates a new random Key or IV into the key array. Uses the <c>LocalEntropicSecureRand</c> technique by default.
@@ -131,7 +128,7 @@ namespace cipup {
 			<param name="key">Byte array to be filled with generated data.</param>
 			<param name="keybytelen">Length of the array in bytes. Recommended values can be found by calling <c>RequiredKeyByteLength()</c> and <c>RequiredIVByteLength()</c>.</param>
 		*/
-		static void GenerateKey(uint8*& key, uint8 keybytelen); //key array will be allocated if null.
+		static void GenerateKey(uint8*& key, uint32 keybytelen); //key array will be allocated if null.
 		/** 
 			<summary>
 			Generates a new random Key or IV into the key array.
@@ -140,7 +137,7 @@ namespace cipup {
 			<param name="keybytelen">Length of the array in bytes. Recommended values can be found by calling <c>RequiredKeyByteLength()</c> and <c>RequiredIVByteLength()</c>.</param>
 			<param name="techchoice">Enum <c>GenerationTechnique</c> specifies the technique used to generate random data. <c>LocalEntropicSecureRand</c> is the preferred choice.</param>
 		*/
-		static void GenerateKey(array<uint8>^ key, uint8 keybytelen, GenerationTechnique techchoice);
+		static void GenerateKey(array<uint8>^ key, uint32 keybytelen, GenerationTechnique techchoice);
 		/** 
 			<summary>
 			Generates a new random Key or IV into the key array.
@@ -150,7 +147,7 @@ namespace cipup {
 			<param name="keybytelen">Length of the array in bytes. Recommended values can be found by calling <c>RequiredKeyByteLength()</c> and <c>RequiredIVByteLength()</c>.</param>
 			<param name="techchoice">Enum <c>GenerationTechnique</c> specifies the technique used to generate random data. <c>LocalEntropicSecureRand</c> is the preferred choice.</param>
 		*/
-		static void GenerateKey(uint8*& key, uint8 keybytelen, GenerationTechnique techchoice);
+		static void GenerateKey(uint8*& key, uint32 keybytelen, GenerationTechnique techchoice);
 
 		/**
 			<summary>
@@ -180,7 +177,7 @@ namespace cipup {
 			<param name="ivbytelen">Length of the IV array in bytes. Required values can be found by calling <c>RequiredIVByteLength()</c>.</param>
 			<returns>A MessageCode signifying success or reason for failure. Consult <c>engine.Messages</c> for a description of each code.</returns>
 		*/
-		MessageCode init( InitAction action, IO::Stream^ output, array<uint8>^ key, uint8 keybytelen, array<uint8>^ iv, uint8 ivbytelen );
+		MessageCode init( InitAction action, System::IO::Stream^ output, array<uint8>^ key, uint8 keybytelen, array<uint8>^ iv, uint8 ivbytelen );
 		/** 
 			<summary>
 			Initializes the engine for encryption or decryption to a stringstream with a Key and IV.
@@ -194,7 +191,7 @@ namespace cipup {
 			<param name="ivbytelen">Length of the IV array in bytes. Required values can be found by calling <c>RequiredIVByteLength()</c>.</param>
 			<returns>A MessageCode signifying success or reason for failure. Consult <c>engine.Messages</c> for a description of each code.</returns>
 		*/
-		MessageCode init( InitAction action, ostringstream* output, uint8* key, uint8 keybytelen, uint8* iv, uint8 ivbytelen );
+		MessageCode init( InitAction action, std::ostringstream* output, uint8* key, uint8 keybytelen, uint8* iv, uint8 ivbytelen );
 		/** 
 			<summary>
 			Initializes the engine for encryption or decryption to a file with a Key and IV.
@@ -210,7 +207,7 @@ namespace cipup {
 			<param name="ivbytelen">Length of the IV array in bytes. Required values can be found by calling <c>RequiredIVByteLength()</c>.</param>
 			<returns>A MessageCode signifying success or reason for failure. Consult <c>engine.Messages</c> for a description of each code.</returns>
 		*/
-		MessageCode init( InitAction action, const char* filename, bool append, array<uint8>^ key, uint8 keybytelen, array<uint8>^ iv, uint8 ivbytelen );
+		MessageCode init( InitAction action, System::String^ filename, bool append, array<uint8>^ key, uint8 keybytelen, array<uint8>^ iv, uint8 ivbytelen );
 		/** 
 			<summary>
 			Initializes the engine for encryption or decryption to a file with a Key and IV.
@@ -258,10 +255,10 @@ namespace cipup {
 			<para>Use <c>bytesread()</c> for the number of bytes of plaintext decrypted from the cyphertext.</para>
 			</summary>
 			<param name="input">Stream of cyphertext containing one message.</param>
-			<exception cref="exception">Thrown when the stream ends before a terminal character in the message is encountered, 
+			<exception cref="std::exception">Thrown when the stream ends before a terminal character in the message is encountered, 
 				if the last bits were part of a character's encoding.</exception>
 		*/
-		void decrypt( IO::Stream^ input );
+		void decrypt( System::IO::Stream^ input );
 		/**
 			<summary>
 			Decrypts the contents of a stream to the initialized output.
@@ -272,10 +269,10 @@ namespace cipup {
 			<para>Use <c>bytesread()</c> for the number of bytes of plaintext decrypted from the cyphertext.</para>
 			</summary>
 			<param name="input">istream of cyphertext containing one message.</param>
-			<exception cref="Exception">Thrown when the stream ends before a terminal character in the message is encountered, 
+			<exception cref="std::exception">Thrown when the stream ends before a terminal character in the message is encountered, 
 				if the last bits were part of a character's encoding.</exception>
 		*/
-		void decrypt( istream& input );
+		void decrypt( std::istream& input );
 		/**
 			<summary>
 			Decrypts the contents of a stream to the initialized output.
@@ -286,10 +283,10 @@ namespace cipup {
 			<para>Use <c>bytesread()</c> for the number of bytes of plaintext decrypted from the cyphertext.</para>
 			</summary>
 			<param name="input">Stream of cyphertext containing one message.</param>
-			<exception cref="Exception">Thrown when the stream ends before a terminal character in the message is encountered, 
+			<exception cref="std::exception">Thrown when the stream ends before a terminal character in the message is encountered, 
 				if the last bits were part of a character's encoding.</exception>
 		*/
-		static void operator>> ( engine% a, IO::Stream^ input );
+		static void operator>> ( engine% a, System::IO::Stream^ input );
 		/**
 			<summary>
 			Decrypts the contents of a stream to the initialized output.
@@ -300,10 +297,10 @@ namespace cipup {
 			<para>Use <c>bytesread()</c> for the number of bytes of plaintext decrypted from the cyphertext.</para>
 			</summary>
 			<param name="input">istream of cyphertext containing one message.</param>
-			<exception cref="Exception">Thrown when the stream ends before a terminal character in the message is encountered, 
+			<exception cref="std::exception">Thrown when the stream ends before a terminal character in the message is encountered, 
 				if the last bits were part of a character's encoding.</exception>
 		*/
-		static void operator>> ( engine% a, istream& input );
+		static void operator>> ( engine% a, std::istream& input );
 
 		/**
 			<summary>
@@ -432,7 +429,7 @@ namespace cipup {
 			</summary>
 			<param name="input">Stream of plaintext</param>			
 		*/
-		void encrypt( IO::Stream^ input );
+		void encrypt( System::IO::Stream^ input );
 		/**
 			<summary>
 			Encrypts the contents of a stream to the initialized output.
@@ -445,7 +442,7 @@ namespace cipup {
 			</summary>
 			<param name="input">istream of plaintext</param>			
 		*/
-		void encrypt( istream& input );
+		void encrypt( std::istream& input );
 		/**
 			<summary>
 			Encrypts the contents of a stream to the initialized output.
@@ -458,7 +455,7 @@ namespace cipup {
 			</summary>
 			<param name="input">Stream of plaintext</param>
 		*/
-		static void operator<< ( engine% a, IO::Stream^ input );
+		static void operator<< ( engine% a, System::IO::Stream^ input );
 		/**
 			<summary>
 			Encrypts the contents of a stream to the initialized output.
@@ -471,7 +468,7 @@ namespace cipup {
 			</summary>
 			<param name="input">istream of plaintext</param>
 		*/
-		static void operator<< ( engine% a, istream& input );
+		static void operator<< ( engine% a, std::istream& input );
 		/**
 			<summary>
 			Terminates and flushes the current message to the output, writing any buffered bits with any required padding and a terminal character.

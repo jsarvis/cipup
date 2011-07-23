@@ -3,9 +3,8 @@
 	ProjectType="Visual C++"
 	Version="9.00"
 	Name="cipup_internal_test"
-	ProjectGUID="{420A8F9B-F633-454F-AFE8-BF7D2AB6A596}"
-	RootNamespace="cipupinternaltest"
-	Keyword="Win32Proj"
+	ProjectGUID="{436116EB-FA68-4FFF-82AC-96BA61315039}"
+	RootNamespace="cipup_internal_test"
 	TargetFrameworkVersion="196613"
 	>
 	<Platforms>
@@ -20,8 +19,8 @@
 			Name="Debug|Win32"
 			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
 			IntermediateDirectory="$(ConfigurationName)"
-			ConfigurationType="2"
-			CharacterSet="1"
+			ConfigurationType="1"
+			CharacterSet="2"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -41,11 +40,9 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
-				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				DebugInformationFormat="4"
 			/>
@@ -60,9 +57,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				LinkIncremental="2"
 				GenerateDebugInformation="true"
-				SubSystem="2"
 				TargetMachine="1"
 			/>
 			<Tool
@@ -92,7 +87,7 @@
 			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="2"
-			CharacterSet="1"
+			CharacterSet="2"
 			ManagedExtensions="1"
 			WholeProgramOptimization="1"
 			>
@@ -115,13 +110,10 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
-				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				DebugInformationFormat="3"
-				ForcedIncludeFiles=""
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -134,10 +126,8 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="$(ProjectDir)..\cipup\Release\rabbit.obj"
-				LinkIncremental="1"
+				AdditionalDependencies="$(SolutionDir)cipup\Release\cipup.obj $(SolutionDir)cipup\Release\rabbit.obj"
 				GenerateDebugInformation="true"
-				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
 				TargetMachine="1"
@@ -171,6 +161,10 @@
 			AssemblyName="nunit.framework, Version=2.5.10.11092, PublicKeyToken=96d09a1eb7f44a77, processorArchitecture=MSIL"
 			MinFrameworkVersion="131072"
 		/>
+		<ProjectReference
+			ReferencedProjectIdentifier="{C1ECC2F6-25BF-44AC-B023-D833329D4CA5}"
+			RelativePathToProject=".\cipup\cipup.vcproj"
+		/>
 	</References>
 	<Files>
 		<Filter
@@ -181,23 +175,6 @@
 			<File
 				RelativePath=".\src\cipup_internal_test.cpp"
 				>
-				<FileConfiguration
-					Name="Debug|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						ForcedIncludeFiles="$(SolutionDir)cipup\src\cipup.cpp"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Release|Win32"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-						AdditionalUsingDirectories=""
-						ForcedIncludeFiles="$(SolutionDir)cipup\src\cipup.cpp"
-					/>
-				</FileConfiguration>
 			</File>
 			<File
 				RelativePath=".\src\dllmain.cpp"

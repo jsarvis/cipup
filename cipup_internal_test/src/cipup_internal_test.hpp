@@ -14,6 +14,11 @@
    limitations under the License.
 ================================================================*/
 
+//#include "..\..\cipup\src\cipup.hpp"
+#include "..\..\cipup\src\engine_internal.hpp"
+//#include "..\..\cipup\bitstream\Bitstream.imp.h"
+//#include "..\..\cipup\prng\ecrypt-sync.h"
+
 #using <mscorlib.dll>
 using namespace System;
 using namespace NUnit::Framework;
@@ -27,10 +32,15 @@ namespace cipup_internal_test {
 	public:
 		test(void);
 		[Test]
-		void GetVersionTextTest();
+		void BitstreamTest();
 		[Test]
-		void PrintVersionTextTest();
-		// TODO: add your methods here.
+		void TreeTest();
+		[Test]
+		void GenGearPresetTest();
+		[Test]
+		void GenGearRandTest();
+		void GenGearTest(uint8* key, uint8* iv);
+		void PrintGears(cipup::huffman_gear** acpGears);
 	};
 
 } //namespace cipup_internal_test

@@ -73,15 +73,13 @@ limitations under the License.
 
 #include "..\bitstream\Bitstream.imp.h"
 #include "..\prng\ecrypt-sync.h"
+#include "stdafx.h"
 
 #include <iostream>
+#include <sstream>
 #include <fstream>
 
 #using <mscorlib.dll>
-using namespace Costella::Bitstream;
-using namespace System;
-using namespace System::Collections::Generic;
-using namespace System::IO;
 
 namespace cipup {
 	
@@ -89,15 +87,22 @@ namespace cipup {
 	enum InitType { NotInit = 0, InitRead, InitWrite };
 	enum DestType { DestNone = 0, DestStream, DestFile };
 
-	private ref class istreamManagedWrapper : Stream {
+	private ref class istreamManagedWrapper : System::IO::Stream {
 	public:
-		istreamManagedWrapper(istream* contents) : boxedStream(contents)
-		{ if (contents == NULL) { throw exception("Can't wrap null stream."); } }
-		void operator>>(uint8& ch) { *boxedStream >> ch; }
-		void read(uint8* s, streamsize n) { boxedStream->read((char*)s,n); }
-		streamsize gcount() { return boxedStream->gcount(); }
+		istreamManagedWrapper(std::istream* contents) : boxedStream(contents)
+		{ if (contents == NULL) { throw std::exception("Can't wrap null stream."); } }
+		istreamManagedWrapper(std::stringstream& contents)
+		{ if (contents == NULL) { throw std::exception("Can't wrap null stream."); } 
+			std::stringstream* copystream = new std::stringstream();
+			*copystream << contents.rdbuf();
+			boxedStream = copystream;
+		}
+		/* void operator>>(uint8& ch) { *boxedStream >> ch; } */ //Not reccommend for use
+		void read(uint8* s, std::streamsize n) { boxedStream->read((char*)s,n); }
+		std::streamsize gcount() { return boxedStream->gcount(); }
 		bool eof() { return boxedStream->eof(); }
 		bool good() { return boxedStream->good(); }
+		void delISPtr() { if (boxedStream != NULL) { delete boxedStream; } }
 		virtual int Read(array<uint8>^ buffer, int offset, int count) override 
 		{
 			uint8* temp = new uint8[count];
@@ -112,23 +117,23 @@ namespace cipup {
 		virtual property bool CanWrite { bool get() override { return false; } }
 		virtual property bool CanSeek { bool get() override { return boxedStream->good(); } }
 		virtual property long long Length { long long get() override { return boxedStream->good() ? 1 : 0; } }
-		virtual property long long Position { long long get() override { return boxedStream->tellg(); } void set(long long value) override { boxedStream->seekg((streamoff)value); } }	
+		virtual property long long Position { long long get() override { return boxedStream->tellg(); } void set(long long value) override { boxedStream->seekg((std::streamoff)value); } }	
 		virtual void Flush() override { } // Do nothing
-		virtual long long Seek(long long offset, SeekOrigin origin) override { boxedStream->seekg((streamoff)offset, (origin==SeekOrigin::Begin) ? ios_base::beg : ((origin==SeekOrigin::End) ? ios_base::end : ios_base::cur)); return boxedStream->tellg(); } 
+		virtual long long Seek(long long offset, System::IO::SeekOrigin origin) override { boxedStream->seekg((std::streamoff)offset, (origin==System::IO::SeekOrigin::Begin) ? std::ios_base::beg : ((origin==System::IO::SeekOrigin::End) ? std::ios_base::end : std::ios_base::cur)); return boxedStream->tellg(); } 
 		virtual void SetLength(long long value) override { } // Do nothing
 	private:
-		istream* boxedStream;
+		std::istream* boxedStream;
 	};
 
-	private ref class ostreamManagedWrapper : Stream {
+	private ref class ostreamManagedWrapper : System::IO::Stream {
 	public:
-		ostreamManagedWrapper(ostream* contents) : boxedStream(contents)
-		{ origFilePtr=NULL; if (contents == NULL) { throw exception("Can't wrap null stream."); } }
-		ostreamManagedWrapper(ofstream* contents)
-		{ boxedStream=(ostream*)contents; origFilePtr=contents; if (contents == NULL) { throw exception("Can't wrap null stream."); } }
+		ostreamManagedWrapper(std::ostream* contents) : boxedStream(contents)
+		{ origFilePtr=NULL; if (contents == NULL) { throw std::exception("Can't wrap null stream."); } }
+		ostreamManagedWrapper(std::ofstream* contents)
+		{ boxedStream=(std::ostream*)contents; origFilePtr=contents; if (contents == NULL) { throw std::exception("Can't wrap null stream."); } }
 		void operator<<(uint8 c) { *boxedStream << c; }
-		void write(const uint8* s, streamsize n) { boxedStream->write((char*)s,n); }
-		void str(const string & s) { ((ostringstream*)boxedStream)->str(s); }
+		void write(const uint8* s, std::streamsize n) { boxedStream->write((char*)s,n); }
+		void str(const std::string & s) { ((std::ostringstream*)boxedStream)->str(s); }
 		void clear() { return boxedStream->clear(); }
 		void close() { if (origFilePtr != NULL) {origFilePtr->close();} }
 		void delfileptr() { if (origFilePtr != NULL) { delete origFilePtr; } }
@@ -145,25 +150,25 @@ namespace cipup {
 		virtual property bool CanWrite { bool get() override { return boxedStream->good(); } }
 		virtual property bool CanSeek { bool get() override { return boxedStream->good(); } }
 		virtual property long long Length { long long get() override { return boxedStream->good() ? 1 : 0; } }
-		virtual property long long Position { long long get() override { return boxedStream->tellp(); } void set(long long value) override { boxedStream->seekp((streamoff)value); } }			
+		virtual property long long Position { long long get() override { return boxedStream->tellp(); } void set(long long value) override { boxedStream->seekp((std::streamoff)value); } }			
 		virtual void Flush() override { boxedStream->flush(); }
-		virtual long long Seek(long long offset, SeekOrigin origin) override { boxedStream->seekp((streamoff)offset, (origin==SeekOrigin::Begin) ? ios_base::beg : ((origin==SeekOrigin::End) ? ios_base::end : ios_base::cur)); return boxedStream->tellp(); } 
+		virtual long long Seek(long long offset, System::IO::SeekOrigin origin) override { boxedStream->seekp((std::streamoff)offset, (origin==System::IO::SeekOrigin::Begin) ? std::ios_base::beg : ((origin==System::IO::SeekOrigin::End) ? std::ios_base::end : std::ios_base::cur)); return boxedStream->tellp(); } 
 		virtual void SetLength(long long value) override { } // Do nothing
 	private:
-		ostream* boxedStream;
-		ofstream* origFilePtr;
+		std::ostream* boxedStream;
+		std::ofstream* origFilePtr;
 	};
 
-	private ref class stringstreamManagedWrapper : Stream {
+	private ref class stringstreamManagedWrapper : System::IO::Stream {
 	public:
-		stringstreamManagedWrapper(stringstream* contents) : boxedStream(contents)
-		{ if (contents == NULL) { throw exception("Can't wrap null stream."); } }
-		void operator>>(uint8& ch) { *boxedStream >> ch; }
+		stringstreamManagedWrapper(std::stringstream* contents) : boxedStream(contents)
+		{ if (contents == NULL) { throw std::exception("Can't wrap null stream."); } }
+		/* void operator>>(uint8& ch) { *boxedStream >> ch; } */ //Not reccommend for use
 		void operator<<(uint8 c) { *boxedStream << c; }
-		void read(uint8* s, streamsize n) { boxedStream->read((char*)s,n); }
-		void write(const uint8* s, streamsize n) { boxedStream->write((char*)s,n); }
-		streamsize gcount() { return boxedStream->gcount(); }
-		void str(const string & s) { boxedStream->str(s); }
+		void read(uint8* s, std::streamsize n) { boxedStream->read((char*)s,n); }
+		void write(const uint8* s, std::streamsize n) { boxedStream->write((char*)s,n); }
+		std::streamsize gcount() { return boxedStream->gcount(); }
+		void str(const std::string & s) { boxedStream->str(s); }
 		void clear() { return boxedStream->clear(); }
 		bool eof() { return boxedStream->eof(); }
 		bool good() { return boxedStream->good(); }
@@ -191,10 +196,10 @@ namespace cipup {
 		virtual property long long Length { long long get() override { return boxedStream->str().length(); } }
 		virtual property long long Position { long long get() override { return boxedStream->tellg(); } void set(long long value) override { } }
 		virtual void Flush() override { boxedStream->flush(); }
-		virtual long long Seek(long long offset, SeekOrigin origin) override { return 0; } // Do nothing
+		virtual long long Seek(long long offset, System::IO::SeekOrigin origin) override { return 0; } // Do nothing
 		virtual void SetLength(long long value) override { } // Do nothing
 	private:
-		stringstream* boxedStream;
+		std::stringstream* boxedStream;
 	};
 
 	private ref class twoBitKeystreamStack {
@@ -206,23 +211,23 @@ namespace cipup {
 		uint8 pop();
 
 	private:
-		List< uint8 >^ twoBitChunks;
+		System::Collections::Generic::List< uint8 >^ twoBitChunks;
 		ECRYPT_ctx* RabbitPRNGState;
 		u8 * keyStream;
 	};
 
-	private ref class oneBitIstreamStack {
+	private ref class oneBitStringstreamStack {
 	public:
-		~oneBitIstreamStack();
+		~oneBitStringstreamStack();
 
-		oneBitIstreamStack( istream& input );
+		oneBitStringstreamStack( std::stringstream& input );
 
 		uint1 pop();
 		bool buffered();
 
 	private:
-		List< uint1 >^ oneBitChunks;
-		Stream^ source;
+		System::Collections::Generic::List< uint1 >^ oneBitChunks;
+		System::IO::Stream^ source;
 	};
 
 #ifdef RANDOM_LOTTERY //During each pass, two numbers have half probability of being selected, which moves pseudorandomly
@@ -252,7 +257,7 @@ namespace cipup {
 		uint8 pop();
 
 	private:
-		List< uint8 >^ byteChunks;
+		System::Collections::Generic::List< uint8 >^ byteChunks;
 		ECRYPT_ctx* RabbitPRNGState;
 		u8 * keyStream;
 	};
@@ -268,7 +273,7 @@ namespace cipup {
 		uint16 pop();
 
 	private:
-		List< uint16 >^ lotteryBalls;
+		System::Collections::Generic::List< uint16 >^ lotteryBalls;
 #ifdef RANDOM_LOTTERY
 		oneBitKeystreamStack^ decisionSource;
 #else
@@ -287,13 +292,13 @@ namespace cipup {
 	};
 	private class treeleaf : public treenode {
 	public:
-		uint8 datum;
+		uint16 datum;
 	};
 
-	namespace {
+	namespace TreeFunc {
 		void deleteTree( treenode* cpTreeCrown );
 		void buildDownTree( treebranch* cpCurrentBranch, uint16& LeafsRemaining, twoBitKeystreamStack^ cpTwoBitChunks );
-		void buildUpTree( treebranch* cpTreeRoot, uint16& LeafsRemaining, twoBitKeystreamStack^ cpTwoBitChunks );
+		treebranch* buildUpTree( treebranch* cpTreeRoot, uint16& LeafsRemaining, twoBitKeystreamStack^ cpTwoBitChunks );
 		void enumerateTree( treenode* cpCurrentNode, uint16& Counter );
 	}
 
@@ -301,10 +306,10 @@ namespace cipup {
 	public:
 		~huffman_gear();
 
-		huffman_gear( std::vector< uint8 > idata, uint8 inumBits );
+		huffman_gear( std::vector< uint8 >& idata, uint8& inumBits );
 
-		std::vector< uint8 >& data;
-		uint8& numBits;
+		std::vector< uint8 > data;
+		uint8 numBits;
 
 	};
 
@@ -314,25 +319,29 @@ namespace cipup {
 
 		huffman_gearbox( InitType itype, ECRYPT_ctx* RabbitPRNGState );
 
-		void encode( uint8 datum, Out<>* bsBitBufferIn, uint16% ui16BitsBuffered );
-		void decode( istream& input, Stream^ output, bool outputWrapped, uint64% ui64BytesRead );
+		void encode( uint8 datum, Costella::Bitstream::Out<>* bsBitBufferIn, uint16% ui16BitsBuffered );
+		void decode( std::stringstream& input, System::IO::Stream^ output, bool outputWrapped, uint64% ui64BytesRead );
+
+		void encodeTerminal( Costella::Bitstream::Out<>* bsBitBufferIn, uint16% ui16BitsBuffered );
 
 	private:
+
+		static uint8 mask[9];
 		
 		InitType eInitType;
 
 		//tree pointer, kept for decoding
 		treenode* cpTreeCrown;
-		uint8* aui8ForwardSet;
+		uint16* aui16ForwardSet;
 		uint1 ui1AlphaBetaSpin;
 
 #ifdef FASTER_HUFFMAN // Faster crank
 		uint16 ui16Counter;
 		huffman_gear*** aacpGearTable;
-		uint8** aaui8ReverseTable;
+		uint16** aaui16ReverseTable;
 #else // More secure		
 		huffman_gear** acpGears;
-		uint8* aui8ReverseSet;
+		uint16* aui16ReverseSet;
 #endif
 
 		void generateGears( treenode* cpCurrentNode, randomLottery^ IndexSelector, uint8 Depth, std::vector< uint8 >& Sequence, huffman_gear** acpGearBox );
@@ -353,10 +362,10 @@ namespace cipup {
 		ECRYPT_ctx* RabbitPRNGState;
 		huffman_gearbox* cpHuffmanGearbox;
 		stringstreamManagedWrapper^ ssBitBufferOut;
-		Out<>* bsBitBufferIn;
+		Costella::Bitstream::Out<>* bsBitBufferIn;
 		uint16 ui16BitsBuffered;
 
-		Stream^ output;
+		System::IO::Stream^ output;
 		bool outputWrapped;
 
 		uint64 ui64BitsWritten;

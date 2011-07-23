@@ -113,7 +113,7 @@ Encrypts a single byte to the initialized output.
 <para>You can incrementally encrypt messages by feeding <c>encrypt()</c> data chunks.
 	If you are writing to a stringstream, you can optionally terminate a message using <c>flush()</c>.
 	If you want additional messages sequentially linked, you can reuse <c>encrypt()</c> after calling <c>flush()</c>.</para><para>Use <c>canwrite()</c> to determine if this action can be performed.</para><para>Use <c>bitswritten()</c> for the number of bits of cyphertext generated from the plaintext (non-buffered bits already written to the output).</para></summary>
-            <param name="datum">Byte of plaintext</param>
+            <param name="datum">Pointer to byte of plaintext</param>
         </member>
         <member name="M:cipup.engine.encrypt(System.Byte*)">
             <summary>
@@ -121,7 +121,7 @@ Encrypts a single byte to the initialized output.
 <para>You can incrementally encrypt messages by feeding <c>encrypt()</c> data chunks.
 	If you are writing to a stringstream, you can optionally terminate a message using <c>flush()</c>.
 	If you want additional messages sequentially linked, you can reuse <c>encrypt()</c> after calling <c>flush()</c>.</para><para>Use <c>canwrite()</c> to determine if this action can be performed.</para><para>Use <c>bitswritten()</c> for the number of bits of cyphertext generated from the plaintext (non-buffered bits already written to the output).</para></summary>
-            <param name="datum">2Byte of plaintext</param>
+            <param name="datum">Pointer to byte of plaintext</param>
         </member>
         <member name="M:cipup.engine.encrypt(System.Byte)">
             <summary>
@@ -129,7 +129,7 @@ Encrypts a single byte to the initialized output.
 <para>You can incrementally encrypt messages by feeding <c>encrypt()</c> data chunks.
 	If you are writing to a stringstream, you can optionally terminate a message using <c>flush()</c>.
 	If you want additional messages sequentially linked, you can reuse <c>encrypt()</c> after calling <c>flush()</c>.</para><para>Use <c>canwrite()</c> to determine if this action can be performed.</para><para>Use <c>bitswritten()</c> for the number of bits of cyphertext generated from the plaintext (non-buffered bits already written to the output).</para></summary>
-            <param name="datum">1Byte of plaintext</param>
+            <param name="datum">Byte of plaintext</param>
         </member>
         <member name="M:cipup.engine.canwrite">
             <summary>
@@ -149,7 +149,7 @@ Decrypts the contents of a stream to the initialized output.
 <para>Consumes the entire stream, but only decrypts one (the first) message.</para><para>If the stream ends before a terminal character in the message is encountered, 
 	then either the message will be cut off or an exception will be thrown.</para><para>Use <c>canread()</c> to determine if this action can be performed.</para><para>Use <c>bytesread()</c> for the number of bytes of plaintext decrypted from the cyphertext.</para></summary>
             <param name="input">istream of cyphertext containing one message.</param>
-            <exception cref="T:System.Exception">Thrown when the stream ends before a terminal character in the message is encountered, 
+            <exception cref="T:std.exception">Thrown when the stream ends before a terminal character in the message is encountered, 
 	if the last bits were part of a character's encoding.</exception>
         </member>
         <member name="M:cipup.engine.op_RightShift(cipup.engine!System.Runtime.CompilerServices.IsImplicitlyDereferenced,System.IO.Stream)">
@@ -158,7 +158,7 @@ Decrypts the contents of a stream to the initialized output.
 <para>Consumes the entire stream, but only decrypts one (the first) message.</para><para>If the stream ends before a terminal character in the message is encountered, 
 	then either the message will be cut off or an exception will be thrown.</para><para>Use <c>canread()</c> to determine if this action can be performed.</para><para>Use <c>bytesread()</c> for the number of bytes of plaintext decrypted from the cyphertext.</para></summary>
             <param name="input">Stream of cyphertext containing one message.</param>
-            <exception cref="T:System.Exception">Thrown when the stream ends before a terminal character in the message is encountered, 
+            <exception cref="T:std.exception">Thrown when the stream ends before a terminal character in the message is encountered, 
 	if the last bits were part of a character's encoding.</exception>
         </member>
         <member name="M:cipup.engine.decrypt(std.basic_istream&lt;System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte,std.char_traits{System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte}&gt;*!System.Runtime.CompilerServices.IsImplicitlyDereferenced)">
@@ -167,7 +167,7 @@ Decrypts the contents of a stream to the initialized output.
 <para>Consumes the entire stream, but only decrypts one (the first) message.</para><para>If the stream ends before a terminal character in the message is encountered, 
 	then either the message will be cut off or an exception will be thrown.</para><para>Use <c>canread()</c> to determine if this action can be performed.</para><para>Use <c>bytesread()</c> for the number of bytes of plaintext decrypted from the cyphertext.</para></summary>
             <param name="input">istream of cyphertext containing one message.</param>
-            <exception cref="T:System.Exception">Thrown when the stream ends before a terminal character in the message is encountered, 
+            <exception cref="T:std.exception">Thrown when the stream ends before a terminal character in the message is encountered, 
 	if the last bits were part of a character's encoding.</exception>
         </member>
         <member name="M:cipup.engine.decrypt(System.IO.Stream)">
@@ -204,7 +204,7 @@ Initializes the engine for encryption or decryption to a file with a Key and IV.
             <param name="ivbytelen">Length of the IV array in bytes. Required values can be found by calling <c>RequiredIVByteLength()</c>.</param>
             <returns>A MessageCode signifying success or reason for failure. Consult <c>engine.Messages</c> for a description of each code.</returns>
         </member>
-        <member name="M:cipup.engine.init(cipup.InitAction,System.SByte!System.Runtime.CompilerServices.IsSignUnspecifiedByte!System.Runtime.CompilerServices.IsConst*,System.Boolean,System.Byte[],System.Byte,System.Byte[],System.Byte)">
+        <member name="M:cipup.engine.init(cipup.InitAction,System.String,System.Boolean,System.Byte[],System.Byte,System.Byte[],System.Byte)">
             <summary>
 Initializes the engine for encryption or decryption to a file with a Key and IV.
 <para>There is an overloaded method for writing to a stringstream.</para><para>This method will open the file designated, and append to an existing file if so directed.</para></summary>
@@ -251,7 +251,7 @@ Destroys the engine.
 Instantiates the engine, allowing access to non-static member methods.
 <para>You must call <c>init()</c> before you can call <c>encrypt()</c> or <c>decrypt()</c>.</para></summary>
         </member>
-        <member name="M:cipup.engine.GenerateKey(System.Byte**!System.Runtime.CompilerServices.IsImplicitlyDereferenced,System.Byte,cipup.GenerationTechnique)">
+        <member name="M:cipup.engine.GenerateKey(System.Byte**!System.Runtime.CompilerServices.IsImplicitlyDereferenced,System.UInt32,cipup.GenerationTechnique)">
             <summary>
 Generates a new random Key or IV into the key array.
 <para>The key array will be allocated if null.</para></summary>
@@ -259,7 +259,7 @@ Generates a new random Key or IV into the key array.
             <param name="keybytelen">Length of the array in bytes. Recommended values can be found by calling <c>RequiredKeyByteLength()</c> and <c>RequiredIVByteLength()</c>.</param>
             <param name="techchoice">Enum <c>GenerationTechnique</c> specifies the technique used to generate random data. <c>LocalEntropicSecureRand</c> is the preferred choice.</param>
         </member>
-        <member name="M:cipup.engine.GenerateKey(System.Byte[],System.Byte,cipup.GenerationTechnique)">
+        <member name="M:cipup.engine.GenerateKey(System.Byte[],System.UInt32,cipup.GenerationTechnique)">
             <summary>
 Generates a new random Key or IV into the key array.
 </summary>
@@ -267,14 +267,14 @@ Generates a new random Key or IV into the key array.
             <param name="keybytelen">Length of the array in bytes. Recommended values can be found by calling <c>RequiredKeyByteLength()</c> and <c>RequiredIVByteLength()</c>.</param>
             <param name="techchoice">Enum <c>GenerationTechnique</c> specifies the technique used to generate random data. <c>LocalEntropicSecureRand</c> is the preferred choice.</param>
         </member>
-        <member name="M:cipup.engine.GenerateKey(System.Byte**!System.Runtime.CompilerServices.IsImplicitlyDereferenced,System.Byte)">
+        <member name="M:cipup.engine.GenerateKey(System.Byte**!System.Runtime.CompilerServices.IsImplicitlyDereferenced,System.UInt32)">
             <summary>
 Generates a new random Key or IV into the key array. Uses the <c>LocalEntropicSecureRand</c> technique by default.
 <para>The key array will be allocated if null.</para></summary>
             <param name="key">Byte array to be filled with generated data.</param>
             <param name="keybytelen">Length of the array in bytes. Recommended values can be found by calling <c>RequiredKeyByteLength()</c> and <c>RequiredIVByteLength()</c>.</param>
         </member>
-        <member name="M:cipup.engine.GenerateKey(System.Byte[],System.Byte)">
+        <member name="M:cipup.engine.GenerateKey(System.Byte[],System.UInt32)">
             <summary>
 Generates a new random Key or IV into the key array. Uses the <c>LocalEntropicSecureRand</c> technique by default.
 </summary>

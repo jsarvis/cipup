@@ -32,6 +32,8 @@
 #include <sstream>
 #include <limits>
 
+#using <mscorlib.dll>
+
 // Put inside the Costella::Bitstream namespace.
 namespace Costella{ namespace Bitstream{
 
@@ -81,20 +83,25 @@ void Out< PositionType >::bits( const std::vector< unsigned char >& data,
   static const NumBitsType invalidMask = mask< NumBitsType >( -1 );
 
   // Check for a valid number of bits.
-  static const std::string f = "Costella::Bitstream::Out::bits(): ";
   if( numBits & invalidMask )
   {
     std::ostringstream oss;
-    oss << f << "Invalid negative number of bits (" << numBits << ")";
-    throw oss.str();
+    oss << "Costella::Bitstream::Out::bits(): Invalid negative number of bits (" << numBits << ")";
+	Console::WriteLine("Costella::Bitstream::Out::bits(): Invalid negative number of bits (" + numBits + ")");
+	throw new exception(oss.str().c_str());
   }
   else if( numBits > static_cast< NumBitsType >( data.size() ) << 3 )
   {
     std::ostringstream oss;
-    oss << f << "Number of bits (" << numBits << 
+    oss << "Costella::Bitstream::Out::bits(): Number of bits (" << numBits << 
       ") exceeds capabilities of vector of size " << data.size() << " (" <<
       ( data.size() << 3 ) << ")";
-    throw oss.str();
+	Console::WriteLine( "Costella::Bitstream::Out::bits(): Number of bits (" + numBits +
+      ") exceeds capabilities of vector of size " +data.size() + " ("+
+      ( data.size() << 3 ) + ")");
+	Console::WriteLine( "Costella::Bitstream::Out::bits(): static cast vector size " +static_cast< NumBitsType >( data.size() ) + " bits ("+
+      ( static_cast< NumBitsType >( data.size() ) << 3 ) + ")");
+    throw new exception(oss.str().c_str());
   }
 
   // Walk along the vector of bytes, and run down the number of bits, until
@@ -122,28 +129,27 @@ void Out< PositionType >::fixed( ValueType value, int width )
   static const ValueType invalidMask = mask< ValueType >( -1 );
 
   // Check that the value is non-negative.
-  static const std::string f = "Costella::Bitstream::Out::fixed(): ";
   if( value & invalidMask )
   {
     std::ostringstream oss;
-    oss << f << "Negative value (" << value << ") not allowed";
-    throw oss.str(); 
+    oss << "Costella::Bitstream::Out::fixed(): Negative value (" << value << ") not allowed";
+    throw new exception(oss.str().c_str());
   }
 
   // Check that the bit-width is valid.
   if( width < 0 )
   {
     std::ostringstream oss;
-    oss << f << "Negative bit-width (" << width << ") not allowed"; 
-    throw oss.str(); 
+    oss << "Costella::Bitstream::Out::fixed(): Negative bit-width (" << width << ") not allowed"; 
+    throw new exception(oss.str().c_str());
   }
   else if( width > std::numeric_limits< ValueType >::digits )
   {
     std::ostringstream oss;
-    oss << f << "Specified bit-width (" << width << 
+    oss << "Costella::Bitstream::Out::fixed(): Specified bit-width (" << width << 
       ") too large for value's type (maximum width " << std::numeric_limits<
       ValueType >::digits << ")";
-    throw oss.str(); 
+    throw new exception(oss.str().c_str());
   }
 
   // Keep going until we have no more bits to do.
@@ -187,19 +193,18 @@ template< typename ValueType >
 int Out< PositionType >::variable( ValueType value, int ldMaxWidth )  
 {
   // Check that value is not zero.
-  static const std::string f = "Costella::Bitstream::Out::variable(): ";
   if( !value )
   {
-    throw f + "Value must be positive, not zero";
+    throw new exception("Costella::Bitstream::Out::variable(): Value must be positive, not zero");
   }
 
   // Check that ldMaxWidth is valid.
   if( ldMaxWidth < 0 || ldMaxWidth > 8 )
   {
     std::ostringstream oss;
-    oss << f << "Invalid ldMaxWidth (" << ldMaxWidth << 
+    oss << "Costella::Bitstream::Out::variable(): Invalid ldMaxWidth (" << ldMaxWidth << 
       "); must be in the range [0,8]";
-    throw oss.str();
+    throw new exception(oss.str().c_str());
   }
 
   // Get the bit-width of the number to be written, and subtract off one for
@@ -210,9 +215,9 @@ int Out< PositionType >::variable( ValueType value, int ldMaxWidth )
   if( width( widthMinusOne ) > ldMaxWidth )
   {
     std::ostringstream oss;
-    oss << f << "ldMaxWidth = " << ldMaxWidth << " but needs to be " <<
+    oss << "Costella::Bitstream::Out::variable(): ldMaxWidth = " << ldMaxWidth << " but needs to be " <<
       width( widthMinusOne ) << " for value 0x" << std::hex << value;
-    throw oss.str();
+    throw new exception(oss.str().c_str());
   }
 
   // Write out one less than the width.
@@ -280,10 +285,9 @@ void In< PositionType >::bits( std::vector< unsigned char >& data,
   static const NumBitsType invalidMask = mask< NumBitsType >( -1 );
 
   // Check for a valid number of bits.
-  static const std::string f = "Costella::Bitstream::In::bits(): ";
   if( numBits & invalidMask )
   {
-    throw f + "Invalid negative number of bits";
+    throw new exception("Costella::Bitstream::In::bits(): Invalid negative number of bits");
   }
 
   // Clear the vector.
@@ -320,10 +324,9 @@ void In< PositionType >::skip( NumBitsType numBits )
   static const NumBitsType invalidMask = mask< NumBitsType >( -1 );
 
   // Check for a valid number of bits.
-  static const std::string f = "Costella::Bitstream::In::skip(): ";
   if( numBits & invalidMask )
   {
-    throw f + "Invalid negative number of bits";
+    throw new exception("Costella::Bitstream::In::skip(): Invalid negative number of bits");
   }
 
   // Run down the number of bits until there are no bits left to skip. Loop
@@ -347,20 +350,19 @@ template< typename ValueType >
 void In< PositionType >::fixed( ValueType& value, int width )
 {
   // Check that the bit-width is valid.
-  static const std::string f = "Costella::Bitstream::In::fixed(): ";
   if( width < 0 )
   {
     std::ostringstream oss;
-    oss << f << "Negative bit-width (" << width << ") not allowed"; 
-    throw oss.str(); 
+    oss << "Costella::Bitstream::In::fixed(): Negative bit-width (" << width << ") not allowed"; 
+    throw new exception(oss.str().c_str());
   }
   else if( width > std::numeric_limits< ValueType >::digits )
   {
     std::ostringstream oss;
-    oss << f << "Specified bit-width (" << width << 
+    oss << "Costella::Bitstream::In::fixed(): Specified bit-width (" << width << 
       ") too large for value's type (maximum width " << std::numeric_limits<
       ValueType >::digits << ")";
-    throw oss.str(); 
+    throw new exception(oss.str().c_str());
   }
 
   // Start with nothing.
@@ -429,12 +431,11 @@ int In< PositionType >::variable( ValueType& value, int ldMaxWidth )
     unread( ldMaxWidth );
 
     // Throw an exception.
-    static const std::string f = "Costella::Bitstream::In::variable(): ";
     std::ostringstream oss;
-    oss << f << "Read bit-width - 1 = " << widthMinusOne << 
+    oss << "Costella::Bitstream::In::variable(): Read bit-width - 1 = " << widthMinusOne << 
       "; too wide for specified value type (width = " <<
       std::numeric_limits< ValueType >::digits << ")";
-    throw oss.str();
+    throw new exception(oss.str().c_str());
   }
 
   // Read the value itself, except for its leading '1' bit.
@@ -527,11 +528,12 @@ void Out< PositionType >::bitsByte( unsigned char byte, int numBits, bool
     if( std::numeric_limits< PositionType >::max() - static_cast<
         PositionType >( numBits ) < position_ )
     {
-      static const std::string f = "Costella::Bitstream::Out::bitsByte(): ";
       std::ostringstream oss;
-      oss << f << "Position type overflow: writing " << numBits << 
+      oss << "Costella::Bitstream::Out::bitsByte(): Position type overflow: writing " << numBits << 
         " bits; previous position = " << position_;
-      throw oss.str();
+	  Console::WriteLine( "Costella::Bitstream::Out::bitsByte(): Position type overflow: writing " + numBits+ 
+        " bits; previous position = " + position_);
+      throw new exception(oss.str().c_str());
     }
     
     // Update position.
@@ -584,7 +586,6 @@ void In< PositionType >::bitsByte( unsigned char& byte, int numBits, bool
 {
   static const unsigned short mask[ 9 ] = { 0x0000, 0x8000, 0xc000, 0xe000,
     0xf000, 0xf800, 0xfc00, 0xfe00, 0xff00 };
-  static const std::string f = "Costella::Bitstream::In::bitsByte(): ";
 
   // Check for flush command.
   if( flush )
@@ -626,18 +627,22 @@ void In< PositionType >::bitsByte( unsigned char& byte, int numBits, bool
     if( numBits > lastNumBits_ )
     {
       std::ostringstream oss;
-      oss << f << "Trying to unread " << numBits << 
+      oss << "Costella::Bitstream::In::bitsByte(): Trying to unread " << numBits << 
         " bits, but last read was only " << lastNumBits_ << " bits";
-      throw oss.str();
+	  Console::WriteLine( "Costella::Bitstream::In::bitsByte(): Trying to unread " + numBits+ 
+        " bits, but last read was only " +lastNumBits_ +" bits");
+      throw new exception(oss.str().c_str());
     }
 
     // Check that the number of bits is not negative.
     if( numBits < 0 )
     {
       std::ostringstream oss;
-      oss << f << "Trying to unread a negative number of bits (" << numBits
+      oss << "Costella::Bitstream::In::bitsByte(): Trying to unread a negative number of bits (" << numBits
         << ")";
-      throw oss.str();
+	  Console::WriteLine("Costella::Bitstream::In::bitsByte(): Trying to unread a negative number of bits (" + numBits
+        + ")");
+      throw new exception(oss.str().c_str());
     }
 
     // Subtract the specified number of bits from the position.
@@ -674,9 +679,11 @@ void In< PositionType >::bitsByte( unsigned char& byte, int numBits, bool
         PositionType >( numBits ) < position_ )
     {
       std::ostringstream oss;
-      oss << f << "Position type overflow: reading " << numBits << 
+      oss << "Costella::Bitstream::In::bitsByte(): Position type overflow: reading " << numBits << 
         " bits; previous position = " << position_;
-      throw oss.str();
+	  Console::WriteLine("Costella::Bitstream::In::bitsByte(): Position type overflow: reading " + numBits + 
+        " bits; previous position = " + position_);
+      throw new exception(oss.str().c_str());
     }
     position_ += static_cast< PositionType >( numBits );
 
@@ -689,7 +696,8 @@ void In< PositionType >::bitsByte( unsigned char& byte, int numBits, bool
       {
         if( doneExtra_ )
         {
-          throw f + "End of input stream, including extra byte";
+			Console::WriteLine("Costella::Bitstream::In::bitsByte(): End of input stream, including extra byte");
+          throw new exception("Costella::Bitstream::In::bitsByte(): End of input stream, including extra byte");
         }
         else
         {
@@ -765,10 +773,9 @@ int width( ValueType value )
   // Check for invalid value.
   if( value & invalidMask )
   {
-    static const std::string f = "Costella::Bitstream::width(): ";
     std::ostringstream oss;
-    oss << f << "Invalid negative value (" << value << ")";
-    throw oss.str();
+    oss << "Costella::Bitstream::width(): Invalid negative value (" << value << ")";
+    throw new exception(oss.str().c_str());
   }
   
   // Deal with zero separately.
@@ -832,8 +839,7 @@ ValueType mask( int n )
   // Check that the type is integral.
   if( !std::numeric_limits< ValueType >::is_integer )
   {
-    static const std::string f = "Costella::Bitstream::mask(): ";
-    throw f + "Type is not integral!";
+    throw new exception("Costella::Bitstream::mask(): Type is not integral!");
   }
 
   // Extract the number of (positive value) bits in this type.
@@ -875,10 +881,9 @@ template< typename ValueType >
 int variableBits( ValueType value, int ldMaxWidth )
 {
   // Check that value is not zero.
-  static const std::string f = "Costella::Bitstream::variableBits(): ";
   if( !value )
   {
-    throw f + "Value must be positive, not zero";
+    throw new exception("Costella::Bitstream::variableBits(): Value must be positive, not zero");
   }
 
   // Get the bit-width of the number to be written, and subtract off one for
@@ -889,9 +894,9 @@ int variableBits( ValueType value, int ldMaxWidth )
   if( width( widthMinusOne ) > ldMaxWidth )
   {
     std::ostringstream oss;
-    oss << f << "ldMaxWidth = " << ldMaxWidth << " but needs to be " <<
+    oss << "Costella::Bitstream::variableBits(): ldMaxWidth = " << ldMaxWidth << " but needs to be " <<
       width( widthMinusOne ) << " for value 0x" << std::hex << value;
-    throw oss.str();
+    throw new exception(oss.str().c_str());
   }
 
   // Return the number of bits required.

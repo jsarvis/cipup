@@ -25,8 +25,11 @@
 #include <ctime>
 
 using namespace System;
+using namespace System::Collections::Generic;
+using namespace System::IO;
 using namespace std;
 using namespace Costella::Bitstream;
+using namespace cipup::TreeFunc;
 
 namespace cipup {
 
@@ -82,17 +85,17 @@ namespace cipup {
 		return IVSIZEINBYTES;
 	}
 
-	void engine::GenerateKey(array<uint8>^ key, uint8 keybytelen)
+	void engine::GenerateKey(array<uint8>^ key, uint32 keybytelen)
 	{
 		GenerateKey(key, keybytelen, GenerationTechnique::LocalEntropicSecureRand);
 	}
 
-	void engine::GenerateKey(uint8*& key, uint8 keybytelen)
+	void engine::GenerateKey(uint8*& key, uint32 keybytelen)
 	{
 		GenerateKey(key, keybytelen, GenerationTechnique::LocalEntropicSecureRand);
 	}
 
-	void engine::GenerateKey(array<uint8>^ key, uint8 keybytelen, GenerationTechnique techchoice)
+	void engine::GenerateKey(array<uint8>^ key, uint32 keybytelen, GenerationTechnique techchoice)
 	{
 		if ( key == nullptr )
 		{
@@ -105,13 +108,13 @@ namespace cipup {
 		GenerateKey(internalKey, keybytelen, techchoice);
 
 		//Push the data back into the managed type
-		for ( uint8 itr = 0; itr < keybytelen; itr++ )
+		for ( uint32 itr = 0; itr < keybytelen; itr++ )
 		{
 			key[itr] = internalKey[itr];
 		}
 	}
 
-	void engine::GenerateKey(uint8*& key, uint8 keybytelen, GenerationTechnique techchoice)
+	void engine::GenerateKey(uint8*& key, uint32 keybytelen, GenerationTechnique techchoice)
 	{
 		
 		if ( key == NULL )
@@ -122,28 +125,32 @@ namespace cipup {
 		if ( techchoice == GenerationTechnique::LocalSimpleRand )
 		{
 			srand ( (uint32) time(NULL) );
-			for ( keybytelen-- ; keybytelen >= 0; keybytelen-- )
+			for ( keybytelen-- ; keybytelen > 0; keybytelen-- )
 			{
-				key[keybytelen] = (uint8) ( ( ( (double)rand() / ( (double)UINT_MAX + 1.0) ) *  (double)UCHAR_MAX ) / 1 );
+				key[keybytelen] = (uint8) ( ( ( (double)rand() / ( (double)RAND_MAX + 1.0) ) *  (double)UCHAR_MAX ) / 1 );
 			}
+			key[0] = (uint8) ( ( ( (double)rand() / ( (double)RAND_MAX + 1.0) ) *  (double)(UCHAR_MAX+1) ) / 1 );
 		}
 		else if ( techchoice == GenerationTechnique::LocalJumpingSimpleRand )
 		{
 			srand ( (uint32) time(NULL) );
-			for ( keybytelen-- ; keybytelen >= 0; keybytelen-- )
+			for ( keybytelen-- ; keybytelen > 0; keybytelen-- )
 			{
-				key[keybytelen] = (uint8) ( ( ( (double)rand() / ( (double)UINT_MAX + 1.0) ) *  (double)UCHAR_MAX ) / 1 );
+				key[keybytelen] = (uint8) ( ( ( (double)rand() / ( (double)RAND_MAX + 1.0) ) *  (double)(UCHAR_MAX+1) ) / 1 );
 				srand ( rand() );
 			}
+			key[0] = (uint8) ( ( ( (double)rand() / ( (double)RAND_MAX + 1.0) ) *  (double)(UCHAR_MAX+1) ) / 1 );
 		}
 		else if ( techchoice == GenerationTechnique::LocalSecureRand )
 		{
 			uint32 number;
-			for ( keybytelen-- ; keybytelen >= 0; keybytelen-- )
+			for ( keybytelen-- ; keybytelen > 0; keybytelen-- )
 			{
 				rand_s( &number );
-				key[keybytelen] = (uint8) ( ( ( (double)number / ( (double)UINT_MAX + 1.0) ) *  (double)UCHAR_MAX ) / 1 );
+				key[keybytelen] = (uint8) ( ( ( (double)number / ( (double)UINT_MAX + 1.0) ) *  (double)(UCHAR_MAX+1) ) / 1 );
 			}
+			rand_s( &number );
+			key[0] = (uint8) ( ( ( (double)number / ( (double)UINT_MAX + 1.0) ) *  (double)(UCHAR_MAX+1) ) / 1 );
 		}
 		else if ( techchoice == GenerationTechnique::LocalEntropicSecureRand )
 		{
@@ -354,7 +361,7 @@ namespace cipup {
 		return MessageCode::InitSuccess;		
 	}
 
-	MessageCode engine::init( InitAction action, const char* filename, bool append, array<uint8>^ key, uint8 keybytelen, array<uint8>^ iv, uint8 ivbytelen )
+	MessageCode engine::init( InitAction action, String^ filename, bool append, array<uint8>^ key, uint8 keybytelen, array<uint8>^ iv, uint8 ivbytelen )
 	{
 		if ( cpInternal->eStatus == NotReady )
 		{
@@ -379,7 +386,13 @@ namespace cipup {
 				internalIV[itr] = iv[itr];
 			}
 
-			return init(action, filename, append, internalKey, keybytelen, internalIV, ivbytelen);
+			char* charstr = (char*)(System::Runtime::InteropServices::Marshal::StringToHGlobalAnsi(filename)).ToPointer();
+
+			MessageCode temp = init(action, charstr, append, internalKey, keybytelen, internalIV, ivbytelen);
+
+			System::Runtime::InteropServices::Marshal::FreeHGlobal(IntPtr((void*)charstr));
+
+			return temp;
 		}
 		else
 		{
@@ -508,7 +521,7 @@ namespace cipup {
 					uint8 middletext[ECRYPT_BLOCKLENGTH]; //middletext output buffer for PRNG
 					stringstream MiddleTextBuf; //middletext input buffer for huffman gearbox
 					//output is plaintext
-					long long numBytesToRead = inputBuf->Length;
+					long long numBytesToRead = (input->Length - input->Position);
 					int n, itr;
 					//XOR entire stream
 					while (numBytesToRead > 0)
@@ -523,21 +536,25 @@ namespace cipup {
 						else if ( n == ECRYPT_BLOCKLENGTH )
 						{
 							//Full block
-							for (itr=0; itr<ECRYPT_BLOCKLENGTH; itr--)
+							for (itr=0; itr<ECRYPT_BLOCKLENGTH; itr++)
 							{
 								cryptext[itr] = inputBuf[itr];
 							}
+
 							ECRYPT_decrypt_blocks(cpInternal->RabbitPRNGState, cryptext, middletext, 1); //XOR
+
 							MiddleTextBuf.write((char*)middletext, ECRYPT_BLOCKLENGTH); //Dump into buffer
 						}
 						else
 						{
 							//Remaining bytes
-							for (itr=0; itr<n; itr--)
+							for (itr=0; itr<n; itr++)
 							{
 								cryptext[itr] = inputBuf[itr];
 							}
+
 							ECRYPT_decrypt_bytes(cpInternal->RabbitPRNGState, cryptext, middletext, n ); //XOR
+
 							MiddleTextBuf.write((char*)middletext, n ); //Dump into buffer, finishing message
 							break;
 						}
@@ -647,7 +664,9 @@ namespace cipup {
 					do
 					{
 						cpInternal->ssBitBufferOut->read(middletext, ECRYPT_BLOCKLENGTH); //Pull a block into buffer
+
 						ECRYPT_encrypt_blocks(cpInternal->RabbitPRNGState, middletext, cryptext, 1); //XOR
+
 						cpInternal->ui64BitsWritten += ECRYPT_BLOCKLENGTH*8;
 						cpInternal->ui16BitsBuffered -= ECRYPT_BLOCKLENGTH*8; //Mark bit buffer reduction
 						if ( cpInternal->outputWrapped )
@@ -656,7 +675,7 @@ namespace cipup {
 						}
 						else
 						{
-							for (itr=0; itr<ECRYPT_BLOCKLENGTH; itr--)
+							for (itr=0; itr<ECRYPT_BLOCKLENGTH; itr++)
 							{
 								outputBuf[itr] = cryptext[itr];
 							}
@@ -726,7 +745,7 @@ namespace cipup {
 				if ( input->CanRead )
 				{
 					array<uint8>^ inputBuf = gcnew array<uint8>(1);
-					long long numBytesToRead = inputBuf->Length;
+					long long numBytesToRead = (input->Length - input->Position);
 					int n;
 					while (numBytesToRead > 0)
 					{
@@ -770,17 +789,17 @@ namespace cipup {
 
 			if ( cpInternal->eStatus == Ready )
 			{
-				uint8 curDatum;
+				uint8 curDatum[1];
 
 				//Consume entire stream
 				while ( !input.eof() )
 				{
-					input >> curDatum;
+					input.read((char*)curDatum,1);
 
-					encrypt(&curDatum);
+					encrypt(curDatum);
 				}
 
-				curDatum = 0; //Wipe data before it goes out of scope
+				curDatum[0] = 0; //Wipe data before it goes out of scope
 
 			}
 		}
@@ -861,9 +880,8 @@ namespace cipup {
 		delete[] keyStream;
 	}
 
-	twoBitKeystreamStack::twoBitKeystreamStack( ECRYPT_ctx* iRabbitPRNGState )
-	{
-		RabbitPRNGState = iRabbitPRNGState;
+	twoBitKeystreamStack::twoBitKeystreamStack( ECRYPT_ctx* iRabbitPRNGState ) : RabbitPRNGState(iRabbitPRNGState)
+	{		
 		keyStream = new u8[KEYSTREAMBUFFERSIZE];
 		twoBitChunks = gcnew List<uint8>();
 	}
@@ -878,17 +896,17 @@ namespace cipup {
 #if KEYSTREAMBUFFERSIZE > 1
 			for ( uint16 index = KEYSTREAMBUFFERSIZE-1; index > 0; index-- )
 			{
-				twoBitChunks->Add( (keyStream[index]>>6) & 0x3 );
-				twoBitChunks->Add( (keyStream[index]>>4) & 0x3 );
-				twoBitChunks->Add( (keyStream[index]>>2) & 0x3 );
 				twoBitChunks->Add( keyStream[index] & 0x3 );
+				twoBitChunks->Add( (keyStream[index]>>2) & 0x3 );
+				twoBitChunks->Add( (keyStream[index]>>4) & 0x3 );
+				twoBitChunks->Add( (keyStream[index]>>6) & 0x3 );				
 				keyStream[index] = 0;
 			}
 #endif
-			twoBitChunks->Add( (keyStream[0]>>6) & 0x3 );
-			twoBitChunks->Add( (keyStream[0]>>4) & 0x3 );
+			twoBitChunks->Add( keyStream[0] & 0x3 );
 			twoBitChunks->Add( (keyStream[0]>>2) & 0x3 );
-			temp = keyStream[0] & 0x3;
+			twoBitChunks->Add( (keyStream[0]>>4) & 0x3 );
+			temp = (keyStream[0]>>6) & 0x3;
 			keyStream[0] = 0;
 		}
 		else
@@ -900,38 +918,41 @@ namespace cipup {
 		return temp;
 	}
 
-	oneBitIstreamStack::~oneBitIstreamStack()
-	{	}
+	oneBitStringstreamStack::~oneBitStringstreamStack()
+	{
+		((istreamManagedWrapper^)source)->delISPtr();
+	}
 
-	oneBitIstreamStack::oneBitIstreamStack( istream& input )
+	oneBitStringstreamStack::oneBitStringstreamStack( stringstream& input )
 	{	
-		source = gcnew istreamManagedWrapper(&input);
+		source = gcnew istreamManagedWrapper(input);
 		oneBitChunks = gcnew List<uint1>();
 	}
 
-	uint1 oneBitIstreamStack::pop()
+	uint1 oneBitStringstreamStack::pop()
 	{
 		uint1 retval;
 
 		if ( oneBitChunks->Count == 0 )
 		{
-			uint8 temp;
+			uint8 temp[1];
 			if ( ((istreamManagedWrapper^)source)->good() )
 			{
-				*((istreamManagedWrapper^)source) >> temp;
+				((istreamManagedWrapper^)source)->read(temp,1);
 			}
 			else
 			{
-				throw exception("Unexpected end of stream!");
+				Console::WriteLine("Unexpected end of stream!");
+				throw new exception("Unexpected end of stream!");				
 			}
-			oneBitChunks->Add( (temp>>7) & 0x1 );
-			oneBitChunks->Add( (temp>>6) & 0x1 );
-			oneBitChunks->Add( (temp>>5) & 0x1 );
-			oneBitChunks->Add( (temp>>4) & 0x1 );
-			oneBitChunks->Add( (temp>>3) & 0x1 );
-			oneBitChunks->Add( (temp>>2) & 0x1 );
-			oneBitChunks->Add( (temp>>1) & 0x1 );
-			retval = temp & 0x1;
+			oneBitChunks->Add( temp[0] & 0x1 );
+			oneBitChunks->Add( (temp[0]>>1) & 0x1 );
+			oneBitChunks->Add( (temp[0]>>2) & 0x1 );
+			oneBitChunks->Add( (temp[0]>>3) & 0x1 );
+			oneBitChunks->Add( (temp[0]>>4) & 0x1 );
+			oneBitChunks->Add( (temp[0]>>5) & 0x1 );
+			oneBitChunks->Add( (temp[0]>>6) & 0x1 );
+			retval = (temp[0]>>7) & 0x1;
 		}
 		else
 		{
@@ -942,9 +963,9 @@ namespace cipup {
 		return retval;
 	}
 
-	bool oneBitIstreamStack::buffered()
+	bool oneBitStringstreamStack::buffered()
 	{
-		return ( oneBitChunks->Count > 0 );
+		return ( (oneBitChunks->Count > 0) || ((istreamManagedWrapper^)source)->good() );
 	}
 	
 #ifdef RANDOM_LOTTERY
@@ -954,9 +975,8 @@ namespace cipup {
 		delete[] keyStream;
 	}
 
-	oneBitKeystreamStack::oneBitKeystreamStack( ECRYPT_ctx* iRabbitPRNGState )
+	oneBitKeystreamStack::oneBitKeystreamStack( ECRYPT_ctx* iRabbitPRNGState ) : RabbitPRNGState(iRabbitPRNGState)
 	{
-		RabbitPRNGState = iRabbitPRNGState;
 		keyStream = new u8[KEYSTREAMBUFFERSIZE];
 		oneBitChunks = gcnew List<uint1>();
 	}
@@ -971,25 +991,25 @@ namespace cipup {
 #if KEYSTREAMBUFFERSIZE > 1
 			for ( uint16 index = KEYSTREAMBUFFERSIZE-1; index > 0; index-- )
 			{
-				oneBitChunks->Add( (keyStream[index]>>7) & 0x1 );
-				oneBitChunks->Add( (keyStream[index]>>6) & 0x1 );
-				oneBitChunks->Add( (keyStream[index]>>5) & 0x1 );
-				oneBitChunks->Add( (keyStream[index]>>4) & 0x1 );
-				oneBitChunks->Add( (keyStream[index]>>3) & 0x1 );
-				oneBitChunks->Add( (keyStream[index]>>2) & 0x1 );
-				oneBitChunks->Add( (keyStream[index]>>1) & 0x1 );
 				oneBitChunks->Add( keyStream[index] & 0x1 );
+				oneBitChunks->Add( (keyStream[index]>>1) & 0x1 );
+				oneBitChunks->Add( (keyStream[index]>>2) & 0x1 );
+				oneBitChunks->Add( (keyStream[index]>>3) & 0x1 );
+				oneBitChunks->Add( (keyStream[index]>>4) & 0x1 );
+				oneBitChunks->Add( (keyStream[index]>>5) & 0x1 );
+				oneBitChunks->Add( (keyStream[index]>>6) & 0x1 );
+				oneBitChunks->Add( (keyStream[index]>>7) & 0x1 );				
 				keyStream[index] = 0;
 			}
 #endif
-			oneBitChunks->Add( (keyStream[0]>>7) & 0x1 );
-			oneBitChunks->Add( (keyStream[0]>>6) & 0x1 );
-			oneBitChunks->Add( (keyStream[0]>>5) & 0x1 );
-			oneBitChunks->Add( (keyStream[0]>>4) & 0x1 );
-			oneBitChunks->Add( (keyStream[0]>>3) & 0x1 );
-			oneBitChunks->Add( (keyStream[0]>>2) & 0x1 );
+			oneBitChunks->Add( keyStream[0] & 0x1 );
 			oneBitChunks->Add( (keyStream[0]>>1) & 0x1 );
-			temp = keyStream[0] & 0x1;
+			oneBitChunks->Add( (keyStream[0]>>2) & 0x1 );
+			oneBitChunks->Add( (keyStream[0]>>3) & 0x1 );
+			oneBitChunks->Add( (keyStream[0]>>4) & 0x1 );
+			oneBitChunks->Add( (keyStream[0]>>5) & 0x1 );
+			oneBitChunks->Add( (keyStream[0]>>6) & 0x1 );
+			temp = (keyStream[0]>>7) & 0x1;
 			keyStream[0] = 0;
 		}
 		else
@@ -1008,9 +1028,8 @@ namespace cipup {
 		delete[] keyStream;
 	}
 
-	oneByteKeystreamStack::oneByteKeystreamStack( ECRYPT_ctx* iRabbitPRNGState )
+	oneByteKeystreamStack::oneByteKeystreamStack( ECRYPT_ctx* iRabbitPRNGState ) : RabbitPRNGState(iRabbitPRNGState)
 	{
-		RabbitPRNGState = iRabbitPRNGState;
 		keyStream = new u8[KEYSTREAMBUFFERSIZE];
 		byteChunks = gcnew List<uint8>();
 	}
@@ -1126,7 +1145,7 @@ namespace cipup {
 #else
 		uint16 curMinIndex = 0, curMaxIndex = lotteryBalls->Count, selection;
 
-		curMinIndex = (uint16) ( ( ( (double)(decisionSource->pop()) / ( (double)UCHAR_MAX + 1.0) ) *  (double)curMaxIndex ) / 1 ); // + curMinIndex;
+		curMinIndex = (uint16) ( ( ( (long double)(decisionSource->pop()) / ( (long double)UCHAR_MAX + 1.0) ) *  (long double)curMaxIndex ) / 1 ); // + curMinIndex;
 
 		selection = lotteryBalls[curMinIndex];
 		lotteryBalls->RemoveAt(curMinIndex);
@@ -1136,7 +1155,7 @@ namespace cipup {
 	}
 
 
-	namespace {
+	namespace TreeFunc {
 		void deleteTree( treenode* cpTreeCrown ) {
 			if (cpTreeCrown != NULL )
 			{
@@ -1275,7 +1294,7 @@ namespace cipup {
 			}
 		}
 
-		void buildUpTree( treebranch* cpTreeRoot, uint16& LeafsRemaining, twoBitKeystreamStack^ cpTwoBitChunks )
+		treebranch* buildUpTree( treebranch* cpTreeRoot, uint16& LeafsRemaining, twoBitKeystreamStack^ cpTwoBitChunks )
 		{
 
 			if ( LeafsRemaining > 1 )
@@ -1293,12 +1312,12 @@ namespace cipup {
 					cpTreeTop->zero->IsLeaf = false;
 					cpTreeTop->one = cpTreeRoot;
 					
-					cpTreeRoot = cpTreeTop;
+					//cpTreeRoot = cpTreeTop;
 
 					//Build down left
 					buildDownTree((treebranch *)(cpTreeTop->zero), LeafsRemaining, cpTwoBitChunks);
 					//Build up further
-					buildUpTree(cpTreeRoot, LeafsRemaining, cpTwoBitChunks);
+					return buildUpTree(cpTreeTop, LeafsRemaining, cpTwoBitChunks);
 				}
 				else if ( temp == 1 )
 				{
@@ -1311,10 +1330,10 @@ namespace cipup {
 					cpTreeTop->zero->IsLeaf = true;
 					cpTreeTop->one = cpTreeRoot;
 					
-					cpTreeRoot = cpTreeTop;
+					//cpTreeRoot = cpTreeTop;
 
 					//Build up further
-					buildUpTree(cpTreeRoot, LeafsRemaining, cpTwoBitChunks);
+					return buildUpTree(cpTreeTop, LeafsRemaining, cpTwoBitChunks);
 				}
 				else if ( temp == 2 )
 				{
@@ -1327,10 +1346,10 @@ namespace cipup {
 					cpTreeTop->one = new treeleaf(); 
 					cpTreeTop->one->IsLeaf = true;
 					
-					cpTreeRoot = cpTreeTop;
+					//cpTreeRoot = cpTreeTop;
 
 					//Build up further
-					buildUpTree(cpTreeRoot, LeafsRemaining, cpTwoBitChunks);
+					return buildUpTree(cpTreeTop, LeafsRemaining, cpTwoBitChunks);
 				}
 				else
 				{
@@ -1343,12 +1362,12 @@ namespace cipup {
 					cpTreeTop->one = new treebranch(); 
 					cpTreeTop->one->IsLeaf = false;
 					
-					cpTreeRoot = cpTreeTop;
+					//cpTreeRoot = cpTreeTop;
 
 					//Build down right
 					buildDownTree((treebranch *)(cpTreeTop->one), LeafsRemaining, cpTwoBitChunks);
 					//Build up further
-					buildUpTree(cpTreeRoot, LeafsRemaining, cpTwoBitChunks);
+					return buildUpTree(cpTreeTop, LeafsRemaining, cpTwoBitChunks);
 				}				
 			}
 			else if ( LeafsRemaining > 0 )
@@ -1376,11 +1395,13 @@ namespace cipup {
 					cpTreeTop->one->IsLeaf = true;
 				}
 
-				cpTreeRoot = cpTreeTop;
+				return cpTreeTop;
 			}
-			//else
-			//Tree finished
-			//return;
+			else
+			{
+				//Tree finished
+				return cpTreeRoot;
+			}
 		}
 
 		void enumerateTree( treenode* cpCurrentNode, uint16& Counter )
@@ -1389,7 +1410,7 @@ namespace cipup {
 			{
 				if (cpCurrentNode->IsLeaf)
 				{
-					((treeleaf*)cpCurrentNode)->datum = (uint8)(Counter++);
+					((treeleaf*)cpCurrentNode)->datum = Counter++;
 				}
 				else
 				{
@@ -1403,10 +1424,18 @@ namespace cipup {
 	huffman_gear::~huffman_gear()
 	{	}
 
-	huffman_gear::huffman_gear( std::vector< uint8 > idata, uint8 inumBits ) : data(idata), numBits(inumBits)
+	huffman_gear::huffman_gear( std::vector< uint8 >& idata, uint8& inumBits ) : data(idata), numBits(inumBits)
 	{
-		//if ( (idata.size*8) < inumBits ) throw Exception(idata.size+" byte Vector can not contain "+inumBits+" bits.");
+		if ( ((idata.size())*8) < inumBits )
+		{
+			ostringstream temp;
+			temp << "Error: " << idata.size() << " byte Vector can not contain " << inumBits << " bits.";
+			Console::WriteLine( "Error: "+ idata.size() + " byte Vector can not contain " + inumBits +" bits." );
+			throw new exception( temp.str().c_str() );
+		}
 	}
+
+	uint8 huffman_gearbox::mask[] = { 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe, 0xff };
 
 	huffman_gearbox::~huffman_gearbox()
 	{
@@ -1417,12 +1446,12 @@ namespace cipup {
 #ifdef FASTER_HUFFMAN // Faster crank	
 			for ( int ctr=0, ctrmax=2*FULL_SET_SIZE; ctr < ctrmax; ctr++ )
 			{
-				delete[] aaui8ReverseTable[ctr];
+				delete[] aaui16ReverseTable[ctr];
 			}
-			delete[] aaui8ReverseTable;
+			delete[] aaui16ReverseTable;
 #else // More secure
-			delete[] aui8ForwardSet;
-			delete[] aui8ReverseSet;
+			delete[] aui16ForwardSet;
+			delete[] aui16ReverseSet;
 #endif
 		}
 		else //InitWrite, encoding
@@ -1447,10 +1476,8 @@ namespace cipup {
 		}
 
 	}
-	huffman_gearbox::huffman_gearbox( InitType itype, ECRYPT_ctx* RabbitPRNGState )
+	huffman_gearbox::huffman_gearbox( InitType itype, ECRYPT_ctx* RabbitPRNGState ) : eInitType(itype)
 	{
-		eInitType = itype;
-
 		// Create tree
 
 		treebranch* cpTreeStart = new treebranch();
@@ -1463,10 +1490,8 @@ namespace cipup {
 
 		twoBitKeystreamStack^ cpTwoBitChunks = gcnew twoBitKeystreamStack(RabbitPRNGState);
 		uint16 temp = FULL_SET_SIZE-2;
-		buildUpTree(cpTreeStart, temp, cpTwoBitChunks);
+		cpTreeCrown = buildUpTree(cpTreeStart, temp, cpTwoBitChunks);
 		delete cpTwoBitChunks;
-
-		cpTreeCrown = cpTreeStart;
 		
 		ui1AlphaBetaSpin = 0;
 		randomLottery^ IndexSelector = gcnew randomLottery( FULL_SET_SIZE, RabbitPRNGState );
@@ -1477,44 +1502,44 @@ namespace cipup {
 			enumerateTree(cpTreeCrown, temp);
 
 #ifdef FASTER_HUFFMAN // Faster crank	
-			aaui8ReverseTable = new uint8*[2*FULL_SET_SIZE];
+			aaui16ReverseTable = new uint16*[2*FULL_SET_SIZE];
 			for ( int ctr=0, ctrmax=2*FULL_SET_SIZE; ctr < ctrmax; ctr++ )
 			{
-				aaui8ReverseTable[ctr] = new uint8[FULL_SET_SIZE];
+				aaui16ReverseTable[ctr] = new uint16[FULL_SET_SIZE];
 			}
 
 			//Generate first row
-			aui8ForwardSet = new uint8[FULL_SET_SIZE];
+			aui16ForwardSet = new uint16[FULL_SET_SIZE];
 
 			for ( int index=0; index < FULL_SET_SIZE; index++ )
 			{
-				aui8ForwardSet[IndexSelector->pop()] = index;
+				aui16ForwardSet[IndexSelector->pop()] = index;
 			}
 
 			for ( int index=0; index < FULL_SET_SIZE; index++ )
 			{
-				aaui8ReverseTable[0][aui8ForwardSet[index]] = index;
+				aaui16ReverseTable[0][aui16ForwardSet[index]] = index;
 			}
 
 			//Generate remaining rows
 			crankCascade();
 
-			delete[] aui8ForwardSet; //No longer needed
+			delete[] aui16ForwardSet; //No longer needed
 			
 #else // More secure
 
-			aui8ForwardSet = new uint8[FULL_SET_SIZE];
+			aui16ForwardSet = new uint16[FULL_SET_SIZE];
 
 			for ( int index=0; index < FULL_SET_SIZE; index++ )
 			{
-				aui8ForwardSet[IndexSelector->pop()] = index;
+				aui16ForwardSet[IndexSelector->pop()] = index;
 			}
 
-			aui8ReverseSet = new uint8[FULL_SET_SIZE];
+			aui16ReverseSet = new uint16[FULL_SET_SIZE];
 
 			for ( int index=0; index < FULL_SET_SIZE; index++ )
 			{
-				aui8ReverseSet[aui8ForwardSet[index]] = index;
+				aui16ReverseSet[aui16ForwardSet[index]] = index;
 			}
 #endif
 		}
@@ -1545,12 +1570,28 @@ namespace cipup {
 		}
 	}
 
+	void huffman_gearbox::encodeTerminal( Costella::Bitstream::Out<>* bsBitBufferIn, uint16% ui16BitsBuffered )
+	{
+		//Terminal Char is CHAR_SET_SIZE
+		huffman_gear* temp;
+
+#ifdef FASTER_HUFFMAN // Faster crank
+		temp = aacpGearTable[ui16Counter][CHAR_SET_SIZE];
+#else // More secure
+		temp = acpGears[CHAR_SET_SIZE];
+#endif
+		bsBitBufferIn->bits(temp->data, temp->numBits);
+		ui16BitsBuffered += temp->numBits;
+		crank();
+	}
+	
 	void huffman_gearbox::encode( uint8 datum, Out<>* bsBitBufferIn, uint16% ui16BitsBuffered  )
 	{
 		huffman_gear* temp;
+
 #ifdef SHRINK_CYPHERTEXT
-		uint8 datumUpper = datum >> 4;
-		datum = datum & 0xF;
+		uint8 datumLower = datum & 0xF;
+		datum = datum >> 4;
 #endif
 
 #ifdef FASTER_HUFFMAN // Faster crank
@@ -1565,9 +1606,9 @@ namespace cipup {
 #ifdef SHRINK_CYPHERTEXT
 
 #ifdef FASTER_HUFFMAN // Faster crank
-		temp = aacpGearTable[ui16Counter][datumUpper];
+		temp = aacpGearTable[ui16Counter][datumLower];
 #else // More secure
-		temp = acpGears[datumUpper];
+		temp = acpGears[datumLower];
 #endif
 		bsBitBufferIn->bits(temp->data, temp->numBits);
 		ui16BitsBuffered += temp->numBits;
@@ -1575,10 +1616,10 @@ namespace cipup {
 #endif
 	}
 
-	void huffman_gearbox::decode( istream& input, Stream^ output, bool outputWrapped, uint64% ui64BytesRead )
+	void huffman_gearbox::decode( stringstream& input, Stream^ output, bool outputWrapped, uint64% ui64BytesRead )
 	{
 		//consume entire stream until dummy found
-		oneBitIstreamStack^ TreeNavigator = gcnew oneBitIstreamStack( input );
+		oneBitStringstreamStack^ TreeNavigator = gcnew oneBitStringstreamStack( input );
 
 		treenode* treeCursor;
 
@@ -1586,7 +1627,7 @@ namespace cipup {
 		uint8 temp;
 #endif
 
-		while ( input.good() || TreeNavigator->buffered() )
+		while ( TreeNavigator->buffered() )
 		{
 			treeCursor = cpTreeCrown; //Rewind to top of tree
 
@@ -1604,34 +1645,35 @@ namespace cipup {
 			}
 
 #ifdef FASTER_HUFFMAN // Faster crank
-			if ( aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum] < CHAR_SET_SIZE )
+			if ( aaui16ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum] < CHAR_SET_SIZE )
 			{
 #ifdef SHRINK_CYPHERTEXT
-				temp = aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum];
+				temp = aaui16ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum];
 #else
 				if (outputWrapped)
 				{
-					((ostreamManagedWrapper^)(cpInternal->output)) << aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum];
+					((ostreamManagedWrapper^)(cpInternal->output)) << aaui16ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum];
 				}
 				else
 				{
-					output->WriteByte(aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum]);
+					output->WriteByte(aaui16ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum]);
 				}
 #endif
 			}
 #else // More secure
-			if ( aui8ReverseSet[((treeleaf*)treeCursor)->datum] < CHAR_SET_SIZE )
+
+			if ( aui16ReverseSet[((treeleaf*)treeCursor)->datum] < CHAR_SET_SIZE )
 			{
 #ifdef SHRINK_CYPHERTEXT
-				temp = aui8ReverseSet[((treeleaf*)treeCursor)->datum];
+				temp = aui16ReverseSet[((treeleaf*)treeCursor)->datum];
 #else
 				if (outputWrapped)
 				{
-					((ostreamManagedWrapper^)(output)) << aui8ReverseSet[((treeleaf*)treeCursor)->datum];
+					((ostreamManagedWrapper^)(output)) << (uint8)(aui16ReverseSet[((treeleaf*)treeCursor)->datum]); // &(CHAR_SET_SIZE-1);
 				}
 				else
 				{
-					output->WriteByte(aui8ReverseSet[((treeleaf*)treeCursor)->datum]);
+					output->WriteByte((uint8)(aui16ReverseSet[((treeleaf*)treeCursor)->datum])); // &(CHAR_SET_SIZE-1);
 				}
 #endif
 				
@@ -1664,34 +1706,35 @@ namespace cipup {
 			}
 
 #ifdef FASTER_HUFFMAN // Faster crank
-			if ( aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum] < CHAR_SET_SIZE )
+			if ( aaui16ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum] < CHAR_SET_SIZE )
 			{
 				if (outputWrapped)
 				{
-					((ostreamManagedWrapper^)(cpInternal->output)) << ( ((aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum])<<4) | temp );
+					((ostreamManagedWrapper^)(cpInternal->output)) << ( (temp<<4) | (aaui16ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum]) );
 				}
 				else
 				{
-					output->WriteByte( ((aaui8ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum])<<4) | temp );
+					output->WriteByte( (temp<<4) | (aaui16ReverseTable[ui16Counter][((treeleaf*)treeCursor)->datum]) );
 				}
 			}
 #else // More secure
-			if ( aui8ReverseSet[((treeleaf*)treeCursor)->datum] < CHAR_SET_SIZE )
+			if ( aui16ReverseSet[((treeleaf*)treeCursor)->datum] < CHAR_SET_SIZE )
 			{
 				if (outputWrapped)
 				{
-					((ostreamManagedWrapper^)(cpInternal->output)) << ( ((aui8ReverseSet[((treeleaf*)treeCursor)->datum])<<4) | temp );
+					((ostreamManagedWrapper^)(cpInternal->output)) << ( (temp<<4) | (aui16ReverseSet[((treeleaf*)treeCursor)->datum]) );
 				}
 				else
 				{
-					output->WriteByte( ((aui8ReverseSet[((treeleaf*)treeCursor)->datum])<<4) | temp );
+					output->WriteByte( (temp<<4) | (aui16ReverseSet[((treeleaf*)treeCursor)->datum]) );
 				}
 			}
 #endif
 			else
 			{
 				//ERROR, should not happen
-				throw Exception("ERROR! Upper part of Half-Byte encoding is terminal character!");
+				Console::WriteLine("ERROR! Lower part of Half-Byte encoding is terminal character!");
+				throw new exception("ERROR! Lower part of Half-Byte encoding is terminal character!");
 			}
 
 			crank();
@@ -1714,9 +1757,9 @@ namespace cipup {
 				{
 					Sequence.push_back(0);
 				}
-				Sequence.back() = Sequence.back() << 1;
+				
 				generateGears( ((treebranch*)cpCurrentNode)->zero, IndexSelector, Depth+1, Sequence, acpGearBox);
-				Sequence.back() = Sequence.back() + 1;
+				Sequence.back() = Sequence.back() | ( 1 << (7 - (Depth%8)));
 				generateGears( ((treebranch*)cpCurrentNode)->one, IndexSelector, Depth+1, Sequence, acpGearBox);
 
 				if (Depth % 8 == 0)
@@ -1725,7 +1768,7 @@ namespace cipup {
 				}
 				else
 				{
-					Sequence.back() = Sequence.back() >> 1;
+					Sequence.back() = Sequence.back() & mask[Depth%8];
 				}
 			}
 		}		
@@ -1742,38 +1785,38 @@ namespace cipup {
 #else // More secure
 		if ( eInitType == InitRead ) //decoding
 		{
-			uint8 formerHead = aui8ForwardSet[0];
-			uint8 formerTail = aui8ForwardSet[FULL_SET_SIZE-1];
+			uint16 formerHead = aui16ForwardSet[0];
+			uint16 formerTail = aui16ForwardSet[FULL_SET_SIZE-1];
 
 			for ( int index=0, stop=(FULL_SET_SIZE/2)-1; index < stop; index++ )
 			{
-				aui8ForwardSet[index] = aui8ForwardSet[index+1];
+				aui16ForwardSet[index] = aui16ForwardSet[index+1];
 			}
 
 			for ( int index=FULL_SET_SIZE-1, stop=(FULL_SET_SIZE/2); index > stop; index-- )
 			{
-				aui8ForwardSet[index] = aui8ForwardSet[index-1];
+				aui16ForwardSet[index] = aui16ForwardSet[index-1];
 			}
 
 			if ( ui1AlphaBetaSpin == 0 )
 			{
 				ui1AlphaBetaSpin = 1;
 
-				aui8ForwardSet[(FULL_SET_SIZE/2)-1] = formerHead;
-				aui8ForwardSet[FULL_SET_SIZE/2] = formerTail;
+				aui16ForwardSet[(FULL_SET_SIZE/2)-1] = formerHead;
+				aui16ForwardSet[FULL_SET_SIZE/2] = formerTail;
 			}
 			else
 			{
 				ui1AlphaBetaSpin = 0;
 				
-				aui8ForwardSet[(FULL_SET_SIZE/2)-1] = formerTail;
-				aui8ForwardSet[FULL_SET_SIZE/2] = formerHead;
+				aui16ForwardSet[(FULL_SET_SIZE/2)-1] = formerTail;
+				aui16ForwardSet[FULL_SET_SIZE/2] = formerHead;
 			}
 
-			// Recreate aui8ReverseSet
+			// Recreate aui16ReverseSet
 			for ( int index=0; index < FULL_SET_SIZE; index++ )
 			{
-				aui8ReverseSet[aui8ForwardSet[index]] = index;
+				aui16ReverseSet[aui16ForwardSet[index]] = index;
 			}
 			
 		}
@@ -1818,38 +1861,38 @@ namespace cipup {
 		{
 			for ( uint16 startIndex=1, stopIndex= 2*FULL_SET_SIZE ; itr < stopIndex; itr++ )
 			{
-				uint8 formerHead = aui8ForwardSet[0];
-				uint8 formerTail = aui8ForwardSet[FULL_SET_SIZE-1];
+				uint16 formerHead = aui16ForwardSet[0];
+				uint16 formerTail = aui16ForwardSet[FULL_SET_SIZE-1];
 
 				for ( int index=0, stop=(FULL_SET_SIZE/2)-1; index < stop; index++ )
 				{
-					aui8ForwardSet[index] = aui8ForwardSet[index+1];
+					aui16ForwardSet[index] = aui16ForwardSet[index+1];
 				}
 
 				for ( int index=FULL_SET_SIZE-1, stop=(FULL_SET_SIZE/2); index > stop; index-- )
 				{
-					aui8ForwardSet[index] = aui8ForwardSet[index-1];
+					aui16ForwardSet[index] = aui16ForwardSet[index-1];
 				}
 
 				if ( ui1AlphaBetaSpin == 0 )
 				{
 					ui1AlphaBetaSpin = 1;
 
-					aui8ForwardSet[(FULL_SET_SIZE/2)-1] = formerHead;
-					aui8ForwardSet[FULL_SET_SIZE/2] = formerTail;
+					aui16ForwardSet[(FULL_SET_SIZE/2)-1] = formerHead;
+					aui16ForwardSet[FULL_SET_SIZE/2] = formerTail;
 				}
 				else
 				{
 					ui1AlphaBetaSpin = 0;
 					
-					aui8ForwardSet[(FULL_SET_SIZE/2)-1] = formerTail;
-					aui8ForwardSet[FULL_SET_SIZE/2] = formerHead;
+					aui16ForwardSet[(FULL_SET_SIZE/2)-1] = formerTail;
+					aui16ForwardSet[FULL_SET_SIZE/2] = formerHead;
 				}
 
-				// Recreate aui8ReverseSet
+				// Recreate aui16ReverseSet
 				for ( int index=0; index < FULL_SET_SIZE; index++ )
 				{
-					aaui8ReverseTable[startIndex][aui8ForwardSet[index]] = index;
+					aaui16ReverseTable[startIndex][aui16ForwardSet[index]] = index;
 				}
 			}
 		}
@@ -1907,60 +1950,67 @@ namespace cipup {
 
 	void engine_internal::flush()
 	{
-		//Write dummy terminal character through huffman gearbox into bit buffer
-		cpHuffmanGearbox->encode( (uint8)CHAR_SET_SIZE, bsBitBufferIn, ui16BitsBuffered );
-		
-		//Flush any remaining bits in the bit buffer into the output stream, which might create padding
-		bsBitBufferIn->flush();
-
-		//ssBitBufferOut is middletext
-		uint8 middletext[ECRYPT_BLOCKLENGTH]; //middletext input buffer for PRNG
-		uint8 cryptext[ECRYPT_BLOCKLENGTH]; //cryptext output buffer for PRNG
-		//output is cryptext
-		array<uint8>^ outputBuf = gcnew array<uint8>(ECRYPT_BLOCKLENGTH);
-		int itr;
-
-		//Consume full blocks from bit buffer, XORing and feeding to output
-		while ( ui16BitsBuffered >= ECRYPT_BLOCKLENGTH*8 )
-		{				
-			ssBitBufferOut->read(middletext, ECRYPT_BLOCKLENGTH); //Pull a block into buffer
-			ECRYPT_encrypt_blocks(RabbitPRNGState, middletext, cryptext, 1); //XOR
-			ui64BitsWritten += ECRYPT_BLOCKLENGTH*8;
-			ui16BitsBuffered -= ECRYPT_BLOCKLENGTH*8; //Mark bit buffer reduction
-
-			if ( outputWrapped )
-			{
-				((ostreamManagedWrapper^)(output))->write(cryptext, ECRYPT_BLOCKLENGTH); //Dump into output
-			}
-			else
-			{
-				for (itr=0; itr<ECRYPT_BLOCKLENGTH; itr--)
-				{
-					outputBuf[itr] = cryptext[itr];
-				}
-				output->Write(outputBuf,0,ECRYPT_BLOCKLENGTH);
-			}
-		}
-		
-		if ( ui16BitsBuffered > 0 )
+		if ( ui16BitsBuffered > 0 || ui64BitsWritten > 0 )
 		{
-			//Remaining bytes
-			uint8 RemainingBytes = (ui16BitsBuffered % 8 > 0 ) ? ((ui16BitsBuffered/8)+1) : (ui16BitsBuffered/8);
-			ssBitBufferOut->read(middletext, RemainingBytes ); //Pull a block into buffer
-			ECRYPT_encrypt_bytes(RabbitPRNGState, middletext, cryptext, RemainingBytes); //XOR
-			ui64BitsWritten += ui16BitsBuffered;
-			ui16BitsBuffered = 0; //Mark bit buffer reduction
-			if ( outputWrapped )
-			{
-				((ostreamManagedWrapper^)(output))->write(cryptext, RemainingBytes); //Dump into output
-			}
-			else
-			{
-				for (itr=0; itr<RemainingBytes; itr--)
+			//Write dummy terminal character through huffman gearbox into bit buffer
+			cpHuffmanGearbox->encodeTerminal( bsBitBufferIn, ui16BitsBuffered );
+			
+			//Flush any remaining bits in the bit buffer into the output stream, which might create padding
+			bsBitBufferIn->flush();
+
+			//ssBitBufferOut is middletext
+			uint8 middletext[ECRYPT_BLOCKLENGTH]; //middletext input buffer for PRNG
+			uint8 cryptext[ECRYPT_BLOCKLENGTH]; //cryptext output buffer for PRNG
+			//output is cryptext
+			array<uint8>^ outputBuf = gcnew array<uint8>(ECRYPT_BLOCKLENGTH);
+			int itr;
+
+			//Consume full blocks from bit buffer, XORing and feeding to output
+			while ( ui16BitsBuffered >= ECRYPT_BLOCKLENGTH*8 )
+			{				
+				ssBitBufferOut->read(middletext, ECRYPT_BLOCKLENGTH); //Pull a block into buffer
+
+				ECRYPT_encrypt_blocks(RabbitPRNGState, middletext, cryptext, 1); //XOR
+				
+				ui64BitsWritten += ECRYPT_BLOCKLENGTH*8;
+				ui16BitsBuffered -= ECRYPT_BLOCKLENGTH*8; //Mark bit buffer reduction
+
+				if ( outputWrapped )
 				{
-					outputBuf[itr] = cryptext[itr];
+					((ostreamManagedWrapper^)(output))->write(cryptext, ECRYPT_BLOCKLENGTH); //Dump into output
 				}
-				output->Write(outputBuf,0,RemainingBytes);
+				else
+				{
+					for (itr=0; itr<ECRYPT_BLOCKLENGTH; itr++)
+					{
+						outputBuf[itr] = cryptext[itr];
+					}
+					output->Write(outputBuf,0,ECRYPT_BLOCKLENGTH);
+				}
+			}
+			
+			if ( ui16BitsBuffered > 0 )
+			{
+				//Remaining bytes
+				uint8 RemainingBytes = (ui16BitsBuffered % 8 > 0 ) ? ((ui16BitsBuffered/8)+1) : (ui16BitsBuffered/8);
+				ssBitBufferOut->read(middletext, RemainingBytes ); //Pull a block into buffer
+
+				ECRYPT_encrypt_bytes(RabbitPRNGState, middletext, cryptext, RemainingBytes); //XOR
+
+				ui64BitsWritten += ui16BitsBuffered;
+				ui16BitsBuffered = 0; //Mark bit buffer reduction
+				if ( outputWrapped )
+				{
+					((ostreamManagedWrapper^)(output))->write(cryptext, RemainingBytes); //Dump into output
+				}
+				else
+				{
+					for (itr=0; itr<RemainingBytes; itr++)
+					{
+						outputBuf[itr] = cryptext[itr];
+					}
+					output->Write(outputBuf,0,RemainingBytes);
+				}
 			}
 		}
 	}

@@ -6,6 +6,8 @@
 #pragma once
 
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
+#define _CRT_RAND_S //Include rand_s()
+#define NOMINMAX //Exclude min/max macros
 // Windows Header Files:
 #include <windows.h>
 
