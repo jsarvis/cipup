@@ -33,7 +33,7 @@ using namespace cipup::TreeFunc;
 
 namespace cipup {
 
-	static char* VERSION_NUMBER = "0.90";
+	static char* VERSION_NUMBER = "1.00";
 
 	String^ engine::GetVersionText()
 	{
@@ -329,10 +329,6 @@ namespace cipup {
 				cpInternal->bsBitBufferIn->flush();
 				cpInternal->ssBitBufferOut->str( string() );
 				cpInternal->ssBitBufferOut->clear();
-
-				//Prepare output stream for cyphertext
-				output->str( string() );
-				output->clear();
 
 				cpInternal->eInitType = InitWrite;
 			}
@@ -633,13 +629,6 @@ namespace cipup {
 		{
 			if ( cpInternal->eStatus == SemiReady )
 			{
-				if ( cpInternal->outputWrapped )
-				{
-					//Clear output stream
-					((ostreamManagedWrapper^)(cpInternal->output))->str( string() );
-					((ostreamManagedWrapper^)(cpInternal->output))->clear();
-				}
-
 				//Reset size
 				cpInternal->ui64BitsWritten = 0;
 				//Set status
@@ -727,13 +716,6 @@ namespace cipup {
 		{
 			if ( cpInternal->eStatus == SemiReady )
 			{
-				if ( cpInternal->outputWrapped )
-				{
-					//Clear output stream
-					((ostreamManagedWrapper^)(cpInternal->output))->str( string() );
-					((ostreamManagedWrapper^)(cpInternal->output))->clear();
-				}
-
 				//Reset size
 				cpInternal->ui64BitsWritten = 0;
 				//Set status
@@ -774,13 +756,6 @@ namespace cipup {
 		{
 			if ( cpInternal->eStatus == SemiReady )
 			{
-				if ( cpInternal->outputWrapped )
-				{
-					//Clear output stream
-					((ostreamManagedWrapper^)(cpInternal->output))->str( string() );
-					((ostreamManagedWrapper^)(cpInternal->output))->clear();
-				}
-
 				//Reset size
 				cpInternal->ui64BitsWritten = 0;
 				//Set status
@@ -796,7 +771,14 @@ namespace cipup {
 				{
 					input.read((char*)curDatum,1);
 
-					encrypt(curDatum);
+					if ( input.gcount() == 0 )
+					{
+						break;
+					}
+					else
+					{
+						encrypt(curDatum);
+					}
 				}
 
 				curDatum[0] = 0; //Wipe data before it goes out of scope

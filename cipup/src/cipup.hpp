@@ -14,6 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ================================================================*/
 
+#pragma once
+#ifndef CIPUP_HPP
+#define CIPUP_HPP
+
 /* Exports for CIPUP.dll */
 
 #include "stdafx.h"
@@ -527,3 +531,4 @@ namespace cipup {
 
 
 } //namespace cipup
+#endif

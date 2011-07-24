@@ -14,13 +14,15 @@
    limitations under the License.
 ================================================================*/
 
-//#include "..\..\cipup\src\cipup.hpp"
+#include "..\..\cipup\src\cipup.hpp"
 #include "..\..\cipup\src\engine_internal.hpp"
 //#include "..\..\cipup\bitstream\Bitstream.imp.h"
 //#include "..\..\cipup\prng\ecrypt-sync.h"
 
+#include "stdafx.h"
+
 #using <mscorlib.dll>
-using namespace System;
+//using namespace System;
 using namespace NUnit::Framework;
 
 // This class is exported from the cipup.internal.test.dll
@@ -32,15 +34,52 @@ namespace cipup_internal_test {
 	public:
 		test(void);
 		[Test]
-		void BitstreamTest();
+		static void BitstreamTest();
 		[Test]
-		void TreeTest();
+		static void TreeTest();
 		[Test]
-		void GenGearPresetTest();
+		static void GenGearPresetTest();
 		[Test]
-		void GenGearRandTest();
-		void GenGearTest(uint8* key, uint8* iv);
-		void PrintGears(cipup::huffman_gear** acpGears);
+		static void GenGearRandTest();
+
+		static void GenGearTest(uint8* key, uint8* iv);
+		static void PrintGears(cipup::huffman_gear** acpGears);
+
+		static array<uint8>^ StreamToStreamTest(cipup::InitAction action, uint8* key, uint8 keylen, uint8* iv, uint8 ivlen, std::istream* src, std::stringstream* dest);
+		static array<uint8>^ StreamFlowOpToStreamTest(cipup::InitAction action, uint8* key, uint8 keylen, uint8* iv, uint8 ivlen, std::istream* src, std::stringstream* dest);
+		static array<uint8>^ VectorToStreamTest(cipup::InitAction action, uint8* key, uint8 keylen, uint8* iv, uint8 ivlen, std::istream* src, std::stringstream* dest);
+		static array<uint8>^ VectorFlowOpToStreamTest(cipup::InitAction action, uint8* key, uint8 keylen, uint8* iv, uint8 ivlen, std::istream* src, std::stringstream* dest);
+		static array<uint8>^ SingleToStreamTest(cipup::InitAction action, uint8* key, uint8 keylen, uint8* iv, uint8 ivlen, std::istream* src, std::stringstream* dest);
+		static array<uint8>^ SingleFlowOpToStreamTest(cipup::InitAction action, uint8* key, uint8 keylen, uint8* iv, uint8 ivlen, std::istream* src, std::stringstream* dest);
+
+		[Test]
+		static void StreamToStreamEncryptRandKeyRandIVRandMessageTest();
+		[Test]
+		static void StreamToStreamEncryptRandKeyRandIVTest();
+		[Test]
+		static void StreamToStreamEncryptRandIVTest();
+		[Test]
+		static void StreamToStreamEncryptTest();
+		[Test]
+		static void StreamToStreamRandKeyRandIVRandMessageFullTest();
+		[Test]
+		static void StreamToStreamRandKeyRandIVFullTest();
+		[Test]
+		static void StreamToStreamRandIVFullTest();
+		[Test]
+		static void StreamToStreamFullTest();
+
+		[Test]
+		static void StreamFlowOpToStreamFullTest();
+		[Test]
+		static void VectorToStreamFullTest();
+		[Test]
+		static void VectorFlowOpToStreamFullTest();
+		[Test]
+		static void SingleToStreamFullTest();
+		[Test]
+		static void SingleFlowOpToStreamFullTest();
+
 	};
 
 } //namespace cipup_internal_test
