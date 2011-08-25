@@ -14,16 +14,16 @@
    limitations under the License.
 ================================================================*/
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
 namespace RCT
 {
-    class Client
+    public class Client
     {
-        static void Main(string[] args)
+        internal static DTO.EmailConfig EmailConfig;
+
+        public Client()
         {
+            //Econfig = new DTO.EmailConfigDTO(); //Pull from nhibernate using DTO.EmailConfigDTO
             Console.WriteLine("Test RCT");
         }
     }
