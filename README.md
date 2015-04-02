@@ -12,6 +12,9 @@ Status: V1.00 Release
   * Uses Rabbit as a PRNG
   * Designed to be used as a DLL, not a standalone application
 
+## License
+Apache License 2.0
+
 # CIPUP Command Line Tool
 
 Standalone executable application of CIPUP.
@@ -21,6 +24,9 @@ Status: V1.00 Release
 ## Features
 
   * File to File, File to Anonymous Pipe, Anonymous Pipe to File, Anonymous Pipe to Anonymous Pipe
+
+## License
+Apache License 2.0
 
 # CIPUP RCT
 
@@ -42,3 +48,6 @@ Status: Preplanning
   * Each message transmitted with RCT is signed and validated.
   * Generates the public and private keys for new users and provides distribution assistance.
   * Maintains an address book of individual's public keys, a catalog of all current groups of which the user is a member with the corresponding secret key, and the user's public and private key.
+
+## License
+Apache License 2.0
